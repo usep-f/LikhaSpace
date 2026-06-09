@@ -47,7 +47,6 @@ $RECYCLE.BIN/
 *.swp
 *.swo
 .agents
-AGENTS.md
 CLAUDE.md
 .agent/
 agent rules
