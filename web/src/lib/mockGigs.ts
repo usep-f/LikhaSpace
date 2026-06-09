@@ -47,6 +47,7 @@ export interface Order {
   priceUSD: number;
   upfrontPercentage: number;
   denialMessage?: string;
+  proposalText?: string;
 
   // Deliverables
   deliverablesLink?: string;
@@ -264,5 +265,19 @@ export const mockOrders: Order[] = [
     chatMessages: [
       { id: 'm3', senderAddress: 'GCLIENT...456', text: 'Hi Karla, we need this done within 5 days, is that possible?', timestamp: '2023-10-26T08:00:00Z' }
     ]
+  },
+  {
+    id: 'order-3',
+    gigId: 'gig-1',
+    clientAddress: 'GCLIENT...789',
+    clientName: 'Neon Ventures',
+    freelancerAddress: 'GDX7...R39P',
+    status: 'pending_acceptance',
+    priceUSD: 500,
+    upfrontPercentage: 20,
+    progressPercentage: 0,
+    proposalText: 'Hi Karla, we love your glassmorphism style! We need a single landing page for our new NFT collection. It needs to have a neon green and dark purple theme. Let me know if you can fit this into your schedule!',
+    changelogs: [],
+    chatMessages: []
   }
 ];

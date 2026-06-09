@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { Sparkles, PlusCircle, Check, X, Eye } from 'lucide-react';
-import { mockGigs, mockOrders } from '@/lib/mockGigs';
+import { mockGigs, mockOrders, Order } from '@/lib/mockGigs';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
+import { ProposalModal } from '@/components/ProposalModal';
 
 // Sub-component: Stats
 const ReputationStatCard: React.FC<{ label: string; value: string; colorClass: string }> = ({ label, value, colorClass }) => (
@@ -129,6 +130,9 @@ const OrdersView: React.FC = () => {
   const [showDenyInput, setShowDenyInput] = useState<Record<string, boolean>>({});
   const [denyMsgs, setDenyMsgs] = useState<Record<string, string>>({});
 
+  // Modal State
+  const [activeProposalOrder, setActiveProposalOrder] = useState<Order | null>(null);
+
   const filteredOrders = myOrders.filter(order => {
     const matchesSearch = order.clientName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
@@ -185,7 +189,7 @@ const OrdersView: React.FC = () => {
                    !showDenyInput[order.id] ? (
                      <div className="flex gap-2 flex-wrap justify-end">
                        <button
-                         onClick={() => alert(`Showing Proposal Modal for order: ${order.id}`)}
+                         onClick={() => setActiveProposalOrder(order)}
                          className="px-4 py-2 rounded bg-neoncyan/10 border border-neoncyan/30 text-neoncyan font-heading font-bold text-xs uppercase hover:bg-neoncyan/20 transition-all flex items-center justify-center gap-1 cursor-pointer"
                        >
                          <Eye className="w-4 h-4" /> View Proposal
@@ -236,6 +240,13 @@ const OrdersView: React.FC = () => {
         totalPages={totalPages}
         onPageChange={setCurrentPage}
       />
+
+      {activeProposalOrder && (
+        <ProposalModal
+          order={activeProposalOrder}
+          onClose={() => setActiveProposalOrder(null)}
+        />
+      )}
     </div>
   );
 };
