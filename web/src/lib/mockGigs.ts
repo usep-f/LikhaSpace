@@ -31,10 +31,10 @@ export interface Gig {
   reviewsCount?: number;
 }
 
-export interface OrderHistoryEvent {
-  status: Order['status'];
+export interface ChangelogEntry {
+  id: string;
   timestamp: string;
-  description?: string;
+  message: string;
 }
 
 export interface Order {
@@ -52,8 +52,11 @@ export interface Order {
   deliverablesLink?: string;
   deliverableNotes?: string;
 
-  // History & Chat
-  statusHistory: OrderHistoryEvent[];
+  // Progress & History
+  progressPercentage: number;
+  changelogs: ChangelogEntry[];
+
+  // Chat
   chatMessages: ChatMessage[];
 }
 
@@ -177,10 +180,12 @@ export const mockOrders: Order[] = [
     upfrontPercentage: 50,
     deliverablesLink: 'https://figma.com/file/mock-album-cover',
     deliverableNotes: 'Here is the final render! Let me know if you need the raw files.',
-    statusHistory: [
-      { status: 'pending_acceptance', timestamp: '2023-10-25T09:00:00Z', description: 'Client sent booking request.' },
-      { status: 'escrow_funded', timestamp: '2023-10-25T10:05:00Z', description: 'Freelancer accepted and Client funded the escrow.' },
-      { status: 'delivered', timestamp: '2023-10-27T15:30:00Z', description: 'Freelancer submitted the deliverables.' }
+    progressPercentage: 100,
+    changelogs: [
+      { id: 'cl1', timestamp: '2023-10-25T14:00:00Z', message: 'Started sketching out the skyline silhouette.' },
+      { id: 'cl2', timestamp: '2023-10-26T10:30:00Z', message: 'Completed the base vector art. Working on the neon glowing effects and palm trees now.' },
+      { id: 'cl3', timestamp: '2023-10-27T09:15:00Z', message: 'Added the grid sun and finalized the typography placement. Preparing final export.' },
+      { id: 'cl4', timestamp: '2023-10-27T15:20:00Z', message: 'Final deliverable submitted for review.' }
     ],
     chatMessages: [
       { id: 'm1', senderAddress: 'GCLIENT...123', text: 'Hey, I love your work! Can we do a Manila skyline for the cover?', timestamp: '2023-10-25T10:00:00Z' },
@@ -193,11 +198,13 @@ export const mockOrders: Order[] = [
     clientAddress: 'GCLIENT...456',
     clientName: 'Crypto Startup',
     freelancerAddress: 'GDX7...R39P',
-    status: 'pending_acceptance',
+    status: 'escrow_funded',
     priceUSD: 500,
     upfrontPercentage: 20,
-    statusHistory: [
-      { status: 'pending_acceptance', timestamp: '2023-10-26T08:00:00Z', description: 'Client sent booking request.' }
+    progressPercentage: 45,
+    changelogs: [
+      { id: 'cl5', timestamp: '2023-10-26T09:00:00Z', message: 'Gathering moodboard references and setting up the Figma design system.' },
+      { id: 'cl6', timestamp: '2023-10-26T16:45:00Z', message: 'Finished the wireframing. Moving on to high-fidelity glassmorphism components.' }
     ],
     chatMessages: [
       { id: 'm3', senderAddress: 'GCLIENT...456', text: 'Hi Karla, we need this done within 5 days, is that possible?', timestamp: '2023-10-26T08:00:00Z' }
