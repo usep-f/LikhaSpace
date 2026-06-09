@@ -65,9 +65,9 @@ const ActiveProjectsView: React.FC = () => {
           {/* Status Badge & Action Buttons Column */}
           <div className="flex flex-col gap-3 w-full lg:w-64">
 
-            {/* Status Badge */}
-            <div className="mb-1 flex justify-start">
-              <span className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider font-heading ${
+            {/* Status Badge (Consistent Size) */}
+            <div className="mb-1 flex justify-start w-full">
+              <span className={`w-full text-center py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider font-heading ${
                 order.status === 'pending_acceptance' ? 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' :
                 order.status === 'escrow_funded' ? 'bg-[#001a1a]/80 text-[#00ffff] border border-[#00ffff]/30 shadow-[0_0_8px_rgba(0,255,255,0.15)]' :
                 'bg-white/10 text-white'
