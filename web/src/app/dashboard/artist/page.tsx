@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
-import { Sparkles, PlusCircle, Check, X } from 'lucide-react';
-import { mockGigs, mockOrders, Gig, Order } from '@/lib/mockGigs';
+import { Sparkles, PlusCircle, Check, X, Eye } from 'lucide-react';
+import { mockGigs, mockOrders } from '@/lib/mockGigs';
 
 // Sub-component: Stats
 const ReputationStatCard: React.FC<{ label: string; value: string; colorClass: string }> = ({ label, value, colorClass }) => (
@@ -37,7 +37,6 @@ const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void
 
 // Listings View
 const ListingsView: React.FC = () => {
-  // Assuming logged-in freelancer is GDX7...R39P (Karla)
   const myGigs = mockGigs.filter(g => g.freelancerAddress === 'GDX7...R39P');
 
   return (
@@ -76,7 +75,6 @@ const ListingsView: React.FC = () => {
 
 // Orders View
 const OrdersView: React.FC = () => {
-  // Pending Order for Karla
   const pendingOrder = mockOrders.find(o => o.freelancerAddress === 'GDX7...R39P' && o.status === 'pending_acceptance');
 
   const [denyMsg, setDenyMsg] = useState('');
@@ -87,48 +85,47 @@ const OrdersView: React.FC = () => {
       <h3 className="font-heading font-bold text-lg text-white">Active Requests</h3>
 
       {pendingOrder ? (
-        <div className="p-6 rounded-xl glass-card border border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
-           <div className="flex justify-between items-start mb-4">
-             <div>
-               <p className="text-[10px] uppercase font-bold tracking-wider text-neoncyan mb-1">New Request</p>
-               <p className="text-sm font-bold text-white">Client: {pendingOrder.clientName}</p>
-               <p className="text-xs text-gray-400 mt-1">Total: ${pendingOrder.priceUSD} • Upfront: {pendingOrder.upfrontPercentage}%</p>
-             </div>
-             <span className="px-3 py-1 rounded bg-neoncyan/10 text-neoncyan font-bold text-xs">Waiting for Acceptance</span>
+        <div className="p-6 rounded-xl glass-card border border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)] flex flex-col md:flex-row justify-between items-center gap-6">
+           <div className="flex-1">
+             <p className="text-[10px] uppercase font-bold tracking-wider text-neoncyan mb-1">New Request</p>
+             <p className="text-sm font-bold text-white">Client: {pendingOrder.clientName}</p>
+             <p className="text-xs text-gray-400 mt-1">Total: ${pendingOrder.priceUSD} • Upfront: {pendingOrder.upfrontPercentage}%</p>
            </div>
 
-           {/* Mock Message View */}
-           <div className="bg-obsidian border border-white/5 p-3 rounded-lg mb-4 text-xs">
-             <p className="text-gray-400 font-bold mb-1">Message from {pendingOrder.clientName}:</p>
-             <p className="text-gray-300 italic">&quot;{pendingOrder.chatMessages[0].text}&quot;</p>
-           </div>
-
-           {!showDenyInput ? (
-             <div className="flex gap-3">
-               <button className="flex-1 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer">
-                 <Check className="w-4 h-4" /> Accept & Wait for Escrow
-               </button>
-               <button
-                 onClick={() => setShowDenyInput(true)}
-                 className="flex-1 py-2 rounded bg-white/5 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-               >
-                 <X className="w-4 h-4" /> Decline
-               </button>
-             </div>
-           ) : (
-             <div className="space-y-3">
-               <textarea
-                 value={denyMsg}
-                 onChange={(e) => setDenyMsg(e.target.value)}
-                 placeholder="Reason for declining (Optional)..."
-                 className="w-full bg-obsidian border border-white/10 rounded-lg p-3 text-xs text-white resize-none"
-               />
+           <div className="flex-1 w-full flex justify-end">
+             {!showDenyInput ? (
                <div className="flex gap-2">
-                 <button className="px-4 py-1.5 rounded bg-hotpink text-white font-bold text-xs cursor-pointer">Confirm Decline</button>
-                 <button onClick={() => setShowDenyInput(false)} className="px-4 py-1.5 rounded text-gray-400 text-xs hover:text-white cursor-pointer">Cancel</button>
+                 <button
+                   onClick={() => alert(`Showing Proposal Modal for order: ${pendingOrder.id}`)}
+                   className="px-4 py-2 rounded bg-neoncyan/10 border border-neoncyan/30 text-neoncyan font-heading font-bold text-xs uppercase hover:bg-neoncyan/20 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                 >
+                   <Eye className="w-4 h-4" /> View Proposal
+                 </button>
+                 <button className="px-4 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer">
+                   <Check className="w-4 h-4" /> Accept
+                 </button>
+                 <button
+                   onClick={() => setShowDenyInput(true)}
+                   className="px-4 py-2 rounded bg-white/5 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                 >
+                   <X className="w-4 h-4" /> Deny
+                 </button>
                </div>
-             </div>
-           )}
+             ) : (
+               <div className="w-full space-y-2">
+                 <textarea
+                   value={denyMsg}
+                   onChange={(e) => setDenyMsg(e.target.value)}
+                   placeholder="Reason for declining (Optional)..."
+                   className="w-full bg-obsidian border border-white/10 rounded-lg p-2 text-xs text-white resize-none h-16"
+                 />
+                 <div className="flex justify-end gap-2">
+                   <button onClick={() => setShowDenyInput(false)} className="px-3 py-1.5 rounded text-gray-400 text-xs hover:text-white cursor-pointer">Cancel</button>
+                   <button className="px-3 py-1.5 rounded bg-hotpink text-white font-bold text-xs cursor-pointer">Confirm Decline</button>
+                 </div>
+               </div>
+             )}
+           </div>
         </div>
       ) : (
         <p className="text-xs text-gray-500">No active orders or requests.</p>
