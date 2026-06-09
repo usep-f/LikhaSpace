@@ -9,9 +9,19 @@ import { Gig, mockProfiles } from '@/lib/mockGigs';
 
 function GigsContent() {
   const searchParams = useSearchParams();
-  const search = searchParams.get('search') || '';
+  const initialSearch = searchParams.get('search') || '';
 
-  // Modal State
+  // Create a controlled state for the search bar
+  const [currentSearch, setCurrentSearch] = useState(initialSearch);
+  const [prevSearchParam, setPrevSearchParam] = useState(initialSearch);
+
+  // Derive state during render instead of using useEffect
+  // See: https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  if (initialSearch !== prevSearchParam) {
+    setPrevSearchParam(initialSearch);
+    setCurrentSearch(initialSearch);
+  }
+
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [selectedGigToBook, setSelectedGigToBook] = useState<Gig | null>(null);
 
@@ -24,7 +34,8 @@ function GigsContent() {
   return (
     <>
       <GigsFeed
-        searchVal={search}
+        searchVal={currentSearch}
+        onSearchChange={setCurrentSearch}
         onProfileClick={(address) => setSelectedProfileId(address)}
         onBookClick={(gig) => setSelectedGigToBook(gig)}
       />

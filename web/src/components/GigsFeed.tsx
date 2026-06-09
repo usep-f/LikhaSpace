@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { mockGigs, Gig } from '@/lib/mockGigs';
-import { Tag, HelpCircle, ArrowUpRight, Star } from 'lucide-react';
+import { Tag, HelpCircle, ArrowUpRight, Star, Search } from 'lucide-react';
 
 // Sub-component: Status Badge
 const StatusBadge: React.FC<{ status: Gig['status'] }> = ({ status }) => {
@@ -25,7 +25,6 @@ interface CardProps {
 }
 
 const GigCard: React.FC<CardProps> = ({ gig,  onBookClick, onProfileClick }) => {
-  
   return (
     <div className={`p-6 rounded-xl glass-card border flex flex-col justify-between space-y-4 transition-all ${
       gig.status === 'occupied'
@@ -63,7 +62,6 @@ const GigCard: React.FC<CardProps> = ({ gig,  onBookClick, onProfileClick }) => 
       </div>
 
       <div className="space-y-4 pt-4 border-t border-white/5">
-        {/* Tags */}
         <div className="flex flex-wrap gap-1.5">
           {gig.tags.map((tag) => (
             <span key={tag} className="inline-flex items-center text-[10px] text-neoncyan bg-neoncyan/5 px-2 py-0.5 rounded border border-neoncyan/10 font-sans">
@@ -73,7 +71,6 @@ const GigCard: React.FC<CardProps> = ({ gig,  onBookClick, onProfileClick }) => 
           ))}
         </div>
 
-        {/* Budget Details & Action */}
         <div className="flex items-center justify-between pt-2">
           <div>
             <p className="text-sm font-bold text-white font-heading mt-0.5 flex items-center gap-2">
@@ -116,7 +113,7 @@ const CategoryTabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {
   ];
 
   return (
-    <div className="flex flex-wrap gap-2 justify-center border-b border-white/5 pb-4">
+    <div className="flex flex-wrap gap-2 justify-center pb-2">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
@@ -137,14 +134,46 @@ const CategoryTabs: React.FC<TabsProps> = ({ activeTab, onTabChange }) => {
   );
 };
 
+// Sub-component: Search Bar
+interface SearchBarProps {
+  value: string;
+  onChange: (val: string) => void;
+}
+
+const SearchBar: React.FC<SearchBarProps> = ({ value, onChange }) => (
+  <div className="relative w-full max-w-lg mx-auto mb-6">
+    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Search for services (e.g. Logo Design, Smart Contracts)..."
+      className="w-full pl-12 pr-4 py-3 bg-obsidian border border-white/10 hover:border-white/20 focus:border-neoncyan focus:ring-1 focus:ring-neoncyan text-white text-sm rounded-xl transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+    />
+  </div>
+);
+
+// Main Feed Component
 interface GigsFeedProps {
   searchVal: string;
+  onSearchChange: (val: string) => void;
   onProfileClick: (address: string) => void;
   onBookClick: (gig: Gig) => void;
 }
 
-export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onProfileClick, onBookClick }) => {
+export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onSearchChange, onProfileClick, onBookClick }) => {
   const [activeTab, setActiveTab] = useState<string>('all');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
+
+  // Track filter changes by deriving state
+  const [prevFilters, setPrevFilters] = useState({ searchVal, activeTab });
+  if (prevFilters.searchVal !== searchVal || prevFilters.activeTab !== activeTab) {
+    setPrevFilters({ searchVal, activeTab });
+    setCurrentPage(1); // Reset page on new search/filter
+  }
 
   const filteredGigs = mockGigs.filter((gig) => {
     const matchesCategory = activeTab === 'all' || gig.category === activeTab;
@@ -157,6 +186,13 @@ export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onProfileClick, o
     return matchesCategory && matchesSearch;
   });
 
+  // Calculate Pagination
+  const totalPages = Math.ceil(filteredGigs.length / itemsPerPage);
+  const paginatedGigs = filteredGigs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <section id="feed" className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
       <div className="text-center mb-8">
@@ -168,11 +204,15 @@ export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onProfileClick, o
         </p>
       </div>
 
-      <CategoryTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      <SearchBar value={searchVal} onChange={onSearchChange} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-        {filteredGigs.length > 0 ? (
-          filteredGigs.map((gig) => (
+      <div className="border-b border-white/5 pb-6 mb-10">
+        <CategoryTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {paginatedGigs.length > 0 ? (
+          paginatedGigs.map((gig) => (
             <GigCard
               key={gig.id}
               gig={gig}
@@ -190,6 +230,32 @@ export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onProfileClick, o
           </div>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center space-x-4 mt-12 pt-8 border-t border-white/5">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white font-heading text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          >
+            Previous
+          </button>
+
+          <div className="text-xs text-gray-400 font-bold">
+            Page <span className="text-white">{currentPage}</span> of <span className="text-white">{totalPages}</span>
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white font-heading text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          >
+            Next
+          </button>
+        </div>
+      )}
+
     </section>
   );
 };
