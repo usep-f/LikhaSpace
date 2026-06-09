@@ -35,24 +35,15 @@ const ActiveProjectsView: React.FC = () => {
       <h3 className="font-heading font-bold text-lg text-white">My Active Bookings</h3>
 
       {clientOrders.map(order => (
-        <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col lg:flex-row justify-between items-center gap-6">
+        <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col lg:flex-row justify-between items-start gap-6">
 
           {/* Order Info */}
-          <div className="flex-1 space-y-4 w-full">
-            <div className="flex justify-between items-start">
-              <div>
-                 <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-1">Freelancer</p>
-                 <p className="text-sm font-bold text-white flex items-center gap-1">
-                   {order.freelancerAddress} <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
-                 </p>
-              </div>
-              <span className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
-                order.status === 'pending_acceptance' ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
-                order.status === 'escrow_funded' ? 'bg-neoncyan/10 text-neoncyan border border-neoncyan/20' :
-                'bg-white/10 text-white'
-              }`}>
-                {order.status.replace('_', ' ')}
-              </span>
+          <div className="flex-1 space-y-4 w-full pt-1">
+            <div>
+               <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-1">Freelancer</p>
+               <p className="text-sm font-bold text-white flex items-center gap-1">
+                 {order.freelancerAddress} <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
+               </p>
             </div>
 
             <div className="bg-obsidian rounded-lg p-4 border border-white/5 max-w-sm">
@@ -71,23 +62,35 @@ const ActiveProjectsView: React.FC = () => {
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col gap-3 w-full lg:w-auto">
+          {/* Status Badge & Action Buttons Column */}
+          <div className="flex flex-col gap-3 w-full lg:w-64">
+
+            {/* Status Badge */}
+            <div className="mb-1 flex justify-start">
+              <span className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider font-heading ${
+                order.status === 'pending_acceptance' ? 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' :
+                order.status === 'escrow_funded' ? 'bg-[#001a1a]/80 text-[#00ffff] border border-[#00ffff]/30 shadow-[0_0_8px_rgba(0,255,255,0.15)]' :
+                'bg-white/10 text-white'
+              }`}>
+                {order.status.replace('_', ' ')}
+              </span>
+            </div>
+
             <button
               onClick={() => alert(`Opening Chat Modal for Order: ${order.id}`)}
-              className="px-6 py-2 rounded bg-white/5 border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 rounded-lg bg-[#141026] border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/5 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <MessageSquare className="w-4 h-4" /> Message
             </button>
             <button
               onClick={() => alert(`Opening Deliverables Modal for Order: ${order.id}`)}
-              className="px-6 py-2 rounded bg-neoncyan/10 border border-neoncyan/30 text-neoncyan font-heading font-bold text-xs uppercase hover:bg-neoncyan/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 rounded-lg bg-[#001a1a]/40 border border-[#00ffff]/30 text-[#00ffff] font-heading font-bold text-xs uppercase hover:bg-[#001a1a]/60 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <ExternalLink className="w-4 h-4" /> View Deliverables
             </button>
             <button
               onClick={() => alert(`Opening Status/Approval Modal for Order: ${order.id}`)}
-              className="px-6 py-2 rounded bg-white text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 rounded-lg bg-white text-black font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Activity className="w-4 h-4" /> View Status
             </button>
