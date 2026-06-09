@@ -2,8 +2,11 @@
 
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
-import { Sparkles, PlusCircle, Check, X } from 'lucide-react';
-import { mockGigs, mockOrders, Gig, Order } from '@/lib/mockGigs';
+import { Sparkles, PlusCircle, Check, X, Eye } from 'lucide-react';
+import { mockGigs, mockOrders, Order } from '@/lib/mockGigs';
+import { Pagination } from '@/components/Pagination';
+import { DashboardSearch } from '@/components/DashboardSearch';
+import { ProposalModal } from '@/components/ProposalModal';
 
 // Sub-component: Stats
 const ReputationStatCard: React.FC<{ label: string; value: string; colorClass: string }> = ({ label, value, colorClass }) => (
@@ -37,8 +40,27 @@ const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void
 
 // Listings View
 const ListingsView: React.FC = () => {
-  // Assuming logged-in freelancer is GDX7...R39P (Karla)
-  const myGigs = mockGigs.filter(g => g.freelancerAddress === 'GDX7...R39P');
+  const allMyGigs = mockGigs.filter(g => g.freelancerAddress === 'GDX7...R39P');
+
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
+  const filteredGigs = allMyGigs.filter(gig => {
+    const matchesSearch = gig.title.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || gig.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const totalPages = Math.ceil(filteredGigs.length / itemsPerPage);
+  const paginatedGigs = filteredGigs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const statusOptions = [
+    { label: 'All Listings', value: 'all' },
+    { label: 'Live (Available)', value: 'active' },
+    { label: 'Occupied (Hidden)', value: 'occupied' }
+  ];
 
   return (
     <div className="space-y-6">
@@ -50,88 +72,180 @@ const ListingsView: React.FC = () => {
         </button>
       </div>
 
+      <DashboardSearch
+        value={search}
+        onChange={(val) => { setSearch(val); setCurrentPage(1); }}
+        placeholder="Search my listings..."
+        filterValue={statusFilter}
+        onFilterChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
+        filterOptions={statusOptions}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {myGigs.map(gig => (
-          <div key={gig.id} className="p-5 rounded-xl glass-card border border-white/5 flex justify-between items-start">
-             <div>
-               <div className="flex items-center gap-2 mb-2">
-                 <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider ${
-                   gig.status === 'active' ? 'bg-neongreen/10 text-neongreen' : 'bg-white/10 text-white'
-                 }`}>
-                   {gig.status === 'active' ? 'Live' : 'Occupied (Hidden)'}
-                 </span>
+        {paginatedGigs.length > 0 ? (
+          paginatedGigs.map(gig => (
+            <div key={gig.id} className="p-5 rounded-xl glass-card border border-white/5 flex justify-between items-start">
+               <div>
+                 <div className="flex items-center gap-2 mb-2">
+                   <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider ${
+                     gig.status === 'active' ? 'bg-neongreen/10 text-neongreen' : 'bg-white/10 text-white'
+                   }`}>
+                     {gig.status === 'active' ? 'Live' : 'Occupied (Hidden)'}
+                   </span>
+                 </div>
+                 <p className="font-bold text-white text-sm leading-tight pr-4">{gig.title}</p>
+                 <p className="text-xs text-hotpink font-bold mt-1">${gig.priceUSD} USD</p>
                </div>
-               <p className="font-bold text-white text-sm leading-tight">{gig.title}</p>
-               <p className="text-xs text-hotpink font-bold mt-1">${gig.priceUSD} USD</p>
-             </div>
-             <div className="flex gap-2">
-               <button className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer">Edit</button>
-             </div>
+               <div className="flex gap-2">
+                 <button className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0">Edit</button>
+               </div>
+            </div>
+          ))
+        ) : (
+          <div className="col-span-full py-12 text-center border border-white/5 rounded-xl glass-card">
+            <p className="text-sm text-gray-400">No listings found.</p>
           </div>
-        ))}
+        )}
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };
 
 // Orders View
 const OrdersView: React.FC = () => {
-  // Pending Order for Karla
-  const pendingOrder = mockOrders.find(o => o.freelancerAddress === 'GDX7...R39P' && o.status === 'pending_acceptance');
+  const myOrders = mockOrders.filter(o => o.freelancerAddress === 'GDX7...R39P');
 
-  const [denyMsg, setDenyMsg] = useState('');
-  const [showDenyInput, setShowDenyInput] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
+  // Active decline interaction state mapping (orderId -> boolean)
+  const [showDenyInput, setShowDenyInput] = useState<Record<string, boolean>>({});
+  const [denyMsgs, setDenyMsgs] = useState<Record<string, string>>({});
+
+  // Modal State
+  const [activeProposalOrder, setActiveProposalOrder] = useState<Order | null>(null);
+
+  const filteredOrders = myOrders.filter(order => {
+    const matchesSearch = order.clientName.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const statusOptions = [
+    { label: 'All Orders', value: 'all' },
+    { label: 'Pending Acceptance', value: 'pending_acceptance' },
+    { label: 'Escrow Funded (Active)', value: 'escrow_funded' },
+    { label: 'Delivered', value: 'delivered' },
+    { label: 'Completed', value: 'completed' }
+  ];
 
   return (
     <div className="space-y-6">
-      <h3 className="font-heading font-bold text-lg text-white">Active Requests</h3>
+      <h3 className="font-heading font-bold text-lg text-white">Active Requests & Orders</h3>
 
-      {pendingOrder ? (
-        <div className="p-6 rounded-xl glass-card border border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
-           <div className="flex justify-between items-start mb-4">
-             <div>
-               <p className="text-[10px] uppercase font-bold tracking-wider text-neoncyan mb-1">New Request</p>
-               <p className="text-sm font-bold text-white">Client: {pendingOrder.clientName}</p>
-               <p className="text-xs text-gray-400 mt-1">Total: ${pendingOrder.priceUSD} • Upfront: {pendingOrder.upfrontPercentage}%</p>
-             </div>
-             <span className="px-3 py-1 rounded bg-neoncyan/10 text-neoncyan font-bold text-xs">Waiting for Acceptance</span>
-           </div>
+      <DashboardSearch
+        value={search}
+        onChange={(val) => { setSearch(val); setCurrentPage(1); }}
+        placeholder="Search by client name..."
+        filterValue={statusFilter}
+        onFilterChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}
+        filterOptions={statusOptions}
+      />
 
-           {/* Mock Message View */}
-           <div className="bg-obsidian border border-white/5 p-3 rounded-lg mb-4 text-xs">
-             <p className="text-gray-400 font-bold mb-1">Message from {pendingOrder.clientName}:</p>
-             <p className="text-gray-300 italic">&quot;{pendingOrder.chatMessages[0].text}&quot;</p>
-           </div>
-
-           {!showDenyInput ? (
-             <div className="flex gap-3">
-               <button className="flex-1 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer">
-                 <Check className="w-4 h-4" /> Accept & Wait for Escrow
-               </button>
-               <button
-                 onClick={() => setShowDenyInput(true)}
-                 className="flex-1 py-2 rounded bg-white/5 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-               >
-                 <X className="w-4 h-4" /> Decline
-               </button>
-             </div>
-           ) : (
-             <div className="space-y-3">
-               <textarea
-                 value={denyMsg}
-                 onChange={(e) => setDenyMsg(e.target.value)}
-                 placeholder="Reason for declining (Optional)..."
-                 className="w-full bg-obsidian border border-white/10 rounded-lg p-3 text-xs text-white resize-none"
-               />
-               <div className="flex gap-2">
-                 <button className="px-4 py-1.5 rounded bg-hotpink text-white font-bold text-xs cursor-pointer">Confirm Decline</button>
-                 <button onClick={() => setShowDenyInput(false)} className="px-4 py-1.5 rounded text-gray-400 text-xs hover:text-white cursor-pointer">Cancel</button>
+      <div className="space-y-4">
+        {paginatedOrders.length > 0 ? (
+          paginatedOrders.map(order => (
+            <div key={order.id} className={`p-6 rounded-xl glass-card border flex flex-col md:flex-row justify-between items-center gap-6 ${
+              order.status === 'pending_acceptance' ? 'border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'border-white/5'
+            }`}>
+               <div className="flex-1 w-full">
+                 <div className="flex items-center gap-3 mb-1">
+                   <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                     order.status === 'pending_acceptance' ? 'text-neoncyan' : 'text-gray-400'
+                   }`}>
+                     {order.status === 'pending_acceptance' ? 'New Request' : 'Active Order'}
+                   </p>
+                   <span className="px-2 py-0.5 rounded bg-white/10 text-white text-[9px] uppercase tracking-wider font-bold">
+                     {order.status.replace('_', ' ')}
+                   </span>
+                 </div>
+                 <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
+                 <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} • Upfront: {order.upfrontPercentage}%</p>
                </div>
-             </div>
-           )}
-        </div>
-      ) : (
-        <p className="text-xs text-gray-500">No active orders or requests.</p>
+
+               <div className="flex-1 w-full flex justify-end">
+                 {order.status === 'pending_acceptance' ? (
+                   !showDenyInput[order.id] ? (
+                     <div className="flex gap-2 flex-wrap justify-end">
+                       <button
+                         onClick={() => setActiveProposalOrder(order)}
+                         className="px-4 py-2 rounded bg-neoncyan/10 border border-neoncyan/30 text-neoncyan font-heading font-bold text-xs uppercase hover:bg-neoncyan/20 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                       >
+                         <Eye className="w-4 h-4" /> View Proposal
+                       </button>
+                       <button className="px-4 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer">
+                         <Check className="w-4 h-4" /> Accept
+                       </button>
+                       <button
+                         onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: true })}
+                         className="px-4 py-2 rounded bg-white/5 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                       >
+                         <X className="w-4 h-4" /> Deny
+                       </button>
+                     </div>
+                   ) : (
+                     <div className="w-full space-y-2">
+                       <textarea
+                         value={denyMsgs[order.id] || ''}
+                         onChange={(e) => setDenyMsgs({ ...denyMsgs, [order.id]: e.target.value })}
+                         placeholder="Reason for declining (Optional)..."
+                         className="w-full bg-obsidian border border-white/10 rounded-lg p-2 text-xs text-white resize-none h-16"
+                       />
+                       <div className="flex justify-end gap-2">
+                         <button onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: false })} className="px-3 py-1.5 rounded text-gray-400 text-xs hover:text-white cursor-pointer">Cancel</button>
+                         <button className="px-3 py-1.5 rounded bg-hotpink text-white font-bold text-xs cursor-pointer">Confirm Decline</button>
+                       </div>
+                     </div>
+                   )
+                 ) : (
+                   <div className="flex gap-2">
+                     <button className="px-4 py-2 rounded bg-white/5 border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors cursor-pointer">
+                       Open Workspace
+                     </button>
+                   </div>
+                 )}
+               </div>
+            </div>
+          ))
+        ) : (
+          <div className="py-12 text-center border border-white/5 rounded-xl glass-card">
+            <p className="text-sm text-gray-400">No active requests or orders found.</p>
+          </div>
+        )}
+      </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
+
+      {activeProposalOrder && (
+        <ProposalModal
+          order={activeProposalOrder}
+          onClose={() => setActiveProposalOrder(null)}
+        />
       )}
     </div>
   );
