@@ -3,7 +3,10 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { Briefcase, MessageSquare, ExternalLink, ShieldCheck, Activity } from 'lucide-react';
-import { mockOrders } from '@/lib/mockGigs';
+import { mockOrders, Order } from '@/lib/mockGigs';
+import { ChatModal } from '@/components/ChatModal';
+import { DeliverablesModal } from '@/components/DeliverablesModal';
+import { StatusModal } from '@/components/StatusModal';
 
 // Tabs Navigation
 const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void }> = ({ active, onTabChange }) => {
@@ -29,6 +32,21 @@ const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void
 
 const ActiveProjectsView: React.FC = () => {
   const clientOrders = mockOrders.filter(o => o.clientAddress === 'GCLIENT...123' || o.clientAddress === 'GCLIENT...456');
+
+  // Modal States
+  const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
+  const [activeDeliverablesOrder, setActiveDeliverablesOrder] = useState<Order | null>(null);
+  const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
+
+  const handleApproveDeliverables = (orderId: string) => {
+    alert(`Approving deliverables for order ${orderId} and releasing Escrow funds!`);
+    setActiveDeliverablesOrder(null);
+  };
+
+  const handleDenyDeliverables = (orderId: string, reason: string) => {
+    alert(`Denying deliverables for order ${orderId}. Reason: ${reason}`);
+    setActiveDeliverablesOrder(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -70,6 +88,7 @@ const ActiveProjectsView: React.FC = () => {
               <span className={`w-full text-center py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider font-heading ${
                 order.status === 'pending_acceptance' ? 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' :
                 order.status === 'escrow_funded' ? 'bg-[#001a1a]/80 text-[#00ffff] border border-[#00ffff]/30 shadow-[0_0_8px_rgba(0,255,255,0.15)]' :
+                order.status === 'delivered' ? 'bg-[#001a00]/80 text-[#39ff14] border border-[#39ff14]/30 shadow-[0_0_8px_rgba(57,255,20,0.15)]' :
                 'bg-white/10 text-white'
               }`}>
                 {order.status.replace('_', ' ')}
@@ -77,19 +96,19 @@ const ActiveProjectsView: React.FC = () => {
             </div>
 
             <button
-              onClick={() => alert(`Opening Chat Modal for Order: ${order.id}`)}
+              onClick={() => setActiveChatOrder(order)}
               className="w-full py-2.5 rounded-lg bg-[#141026] border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/5 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <MessageSquare className="w-4 h-4" /> Message
             </button>
             <button
-              onClick={() => alert(`Opening Deliverables Modal for Order: ${order.id}`)}
+              onClick={() => setActiveDeliverablesOrder(order)}
               className="w-full py-2.5 rounded-lg bg-[#001a1a]/40 border border-[#00ffff]/30 text-[#00ffff] font-heading font-bold text-xs uppercase hover:bg-[#001a1a]/60 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <ExternalLink className="w-4 h-4" /> View Deliverables
             </button>
             <button
-              onClick={() => alert(`Opening Status/Approval Modal for Order: ${order.id}`)}
+              onClick={() => setActiveStatusOrder(order)}
               className="w-full py-2.5 rounded-lg bg-white text-black font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Activity className="w-4 h-4" /> View Status
@@ -98,6 +117,31 @@ const ActiveProjectsView: React.FC = () => {
 
         </div>
       ))}
+
+      {/* Render Modals */}
+      {activeChatOrder && (
+        <ChatModal
+          order={activeChatOrder}
+          currentAddress={activeChatOrder.clientAddress}
+          onClose={() => setActiveChatOrder(null)}
+        />
+      )}
+
+      {activeDeliverablesOrder && (
+        <DeliverablesModal
+          order={activeDeliverablesOrder}
+          onClose={() => setActiveDeliverablesOrder(null)}
+          onApprove={handleApproveDeliverables}
+          onDeny={handleDenyDeliverables}
+        />
+      )}
+
+      {activeStatusOrder && (
+        <StatusModal
+          order={activeStatusOrder}
+          onClose={() => setActiveStatusOrder(null)}
+        />
+      )}
     </div>
   );
 };

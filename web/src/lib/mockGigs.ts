@@ -31,6 +31,12 @@ export interface Gig {
   reviewsCount?: number;
 }
 
+export interface OrderHistoryEvent {
+  status: Order['status'];
+  timestamp: string;
+  description?: string;
+}
+
 export interface Order {
   id: string;
   gigId: string;
@@ -41,7 +47,13 @@ export interface Order {
   priceUSD: number;
   upfrontPercentage: number;
   denialMessage?: string;
+
+  // Deliverables
   deliverablesLink?: string;
+  deliverableNotes?: string;
+
+  // History & Chat
+  statusHistory: OrderHistoryEvent[];
   chatMessages: ChatMessage[];
 }
 
@@ -160,9 +172,16 @@ export const mockOrders: Order[] = [
     clientAddress: 'GCLIENT...123',
     clientName: 'Retro Records',
     freelancerAddress: 'GBB1...M98L',
-    status: 'escrow_funded',
+    status: 'delivered',
     priceUSD: 180,
     upfrontPercentage: 50,
+    deliverablesLink: 'https://figma.com/file/mock-album-cover',
+    deliverableNotes: 'Here is the final render! Let me know if you need the raw files.',
+    statusHistory: [
+      { status: 'pending_acceptance', timestamp: '2023-10-25T09:00:00Z', description: 'Client sent booking request.' },
+      { status: 'escrow_funded', timestamp: '2023-10-25T10:05:00Z', description: 'Freelancer accepted and Client funded the escrow.' },
+      { status: 'delivered', timestamp: '2023-10-27T15:30:00Z', description: 'Freelancer submitted the deliverables.' }
+    ],
     chatMessages: [
       { id: 'm1', senderAddress: 'GCLIENT...123', text: 'Hey, I love your work! Can we do a Manila skyline for the cover?', timestamp: '2023-10-25T10:00:00Z' },
       { id: 'm2', senderAddress: 'GBB1...M98L', text: 'Absolutely! I will get started right away now that the escrow is funded.', timestamp: '2023-10-25T10:05:00Z' }
@@ -177,6 +196,9 @@ export const mockOrders: Order[] = [
     status: 'pending_acceptance',
     priceUSD: 500,
     upfrontPercentage: 20,
+    statusHistory: [
+      { status: 'pending_acceptance', timestamp: '2023-10-26T08:00:00Z', description: 'Client sent booking request.' }
+    ],
     chatMessages: [
       { id: 'm3', senderAddress: 'GCLIENT...456', text: 'Hi Karla, we need this done within 5 days, is that possible?', timestamp: '2023-10-26T08:00:00Z' }
     ]
