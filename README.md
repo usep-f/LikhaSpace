@@ -1,134 +1,101 @@
-# StellarX Workshop Starter
+# LikhaSpace
 
-A ready-to-run scaffold for the **StellarX PH workshop @ PUP QC**. It gives you a
-working Stellar app on **testnet** so you can spend the workshop bending it toward
-your own idea instead of fighting setup.
+LikhaSpace is a decentralized, trustless freelance marketplace for Filipino creatives and global clients, featuring automated smart contract escrows, zero platform extraction fees, and immutable on-chain reputation tracking.
 
-It covers **both** workshop tracks:
+## Problem
+In the Philippines, the freelance and creative economy is a vital source of income. However, traditional freelance platforms extract heavy toll fees (ranging from 10% to 20% of hard-earned income), require slow, centralized payout procedures, and pose constant payment security risks for both clients and freelancers. Creatives face client payment defaults, while clients risk paying upfront for undelivered or substandard work. There is a critical need for a localized, trustless payment gateway that secures agreements without middleman extraction fees or geographic payment processing delays.
 
-- **Fullstack payments** — a Next.js app: connect Freighter → fund via Friendbot →
-  view XLM/USDC balances → send a payment → confirm on-chain.
-- **Soroban smart contract** — a small Rust contract (a *Savings Goal* tracker)
-  you build, test, deploy with the Stellar CLI, and call from the same frontend.
+## How It Works
+1. **Onboarding:** Users connect their Freighter wallet on the Stellar Testnet and choose their role as either a **Client**, an **Artist**, or a **Mediator**.
+2. **Posting a Gig:** A Client posts a freelance project by specifying the project details, budget in USD (automatically converted to XLM using an on-chain Reflector oracle), the selected freelancer's address, and an upfront payment percentage (0% to 50%).
+3. **Escrow Funding:** The Client funds and initializes the escrow by submitting a Soroban contract transaction. Up to 50% of the budget is dispatched instantly as an upfront payment to the Artist, while the remaining balance is locked in the `likha-escrow` smart contract.
+4. **Deliverable Submission:** The Artist completes the work and submits the proof of delivery (e.g., a link to the project deliverables), logging the work link directly into the contract state.
+5. **Release or Dispute:**
+   - **Happy Path:** The Client reviews the deliverable and releases the remaining locked balance directly to the Artist's wallet via a smart contract call.
+   - **Dispute Path:** If a conflict arises, either party can file a dispute, routing the escrow to a decentralized Mediator. The Mediator uses a slider interface to configure a settlement split (Artist % vs. Client %) and executes the resolution transaction (with a 2.5% platform fee routed to the protocol).
+6. **Reputation Tracking:** Once a gig is completed, the contract updates the Artist's on-chain stats (completed project count and total XLM earned), providing an immutable rating score.
 
-```
-.
-├── web/                      # Next.js 16 + TypeScript + Tailwind frontend
-├── contracts/savings-goal/   # Rust Soroban contract (init / contribute / get_state)
-├── scripts/                  # deploy.ps1 (Windows) / deploy.sh
-├── Cargo.toml                # Rust workspace
-└── CLAUDE.md                 # stack notes + Stellar gotchas (read this!)
-```
+## How It Uses Stellar
+Stellar is the core engine of LikhaSpace:
+- **Soroban Smart Contracts:** The `likha-escrow` Rust contract secures the freelance agreements. It locks the funds in escrow, releases upfront payments, logs deliverables, and handles dispute resolution splits on-chain.
+- **XLM Payments:** Used for paying freelancers, funding escrows, and paying low, predictable network transaction fees (less than $0.0001 per transaction).
+- **Price Oracles (Reflector):** The `reflector-mock` contract mocks/interacts with Reflector price feeds to convert Client-inputted USD budgets into the exact amount of XLM required for escrow lockups.
+- **On-Chain Identity & Freighter Wallet:** Users sign transactions securely using the Freighter wallet, and their public keys double as their unique identifiers on the platform.
+- **Horizon & RPC API:** Used to query account balances, transaction histories, and listen to on-chain events and contract states.
 
-## Prerequisites
+## Track
+Financial Inclusion / Remittance
 
-From the [workshop setup checklist](https://stellar-pup-qc-may-2026-checklist.vercel.app/):
+## Tech Stack
+- **Framework:** Next.js 16 (React 19, TypeScript)
+- **Stellar SDK:** `@stellar/stellar-sdk` v15.1.0
+- **Wallet Integration:** `@stellar/freighter-api` v6.0.1
+- **Network:** Stellar Testnet
+- **Database:** Firebase Firestore (v12.14.0) for indexing and caching active listings and user metadata
+- **Styling:** Tailwind CSS v4 and Lucide React Icons
 
-- **Node.js 20+** and **npm** — for the frontend.
-- **Freighter** browser extension — create a wallet, switch it to **Test Net**.
-- For the contract track: **Rust**, the `wasm32v1-none` target, and the **Stellar CLI**.
+## Setup & Run
+### Prerequisites
+- **Node.js 20+** and **npm**
+- **Freighter Browser Extension** configured to the **Test Net**
+- **Rust** and **Stellar CLI** (required for building and deploying smart contracts)
 
-You can run the **payments demo with just Node + Freighter** — Rust/CLI are only
-needed to deploy the Soroban contract.
+### Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/usep-f/LikhaSpace.git
+   cd LikhaSpace
+   ```
 
-### Install the contract toolchain (Windows)
+2. Install the web frontend dependencies:
+   ```bash
+   cd web
+   npm install
+   ```
 
-Install Rust and the Stellar CLI:
+3. Set up the environment variables:
+   Create a `web/.env.local` file (or update the existing `web/.env` file) with the following environment variables:
+   ```env
+   NEXT_PUBLIC_STELLAR_NETWORK=testnet
+   NEXT_PUBLIC_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
+   NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+   NEXT_PUBLIC_CONTRACT_ID=
+   
+   # Firebase Web Config (Paste yours here)
+   NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=likhaspace-dfd01
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+   NEXT_PUBLIC_FIREBASE_APP_ID=1:your_firebase_messaging_sender_id:web:642b85a357eb8787b1a2bc
+   ```
 
-```powershell
-winget install --id Rustlang.Rustup -e --accept-source-agreements --accept-package-agreements
-winget install --id Stellar.StellarCLI -e --accept-source-agreements --accept-package-agreements
-```
+4. Build and deploy the smart contracts to Testnet (Windows):
+   ```powershell
+   # From the root directory, run the deploy script:
+   .\scripts\deploy.ps1
+   ```
+   *Note: This compiles the contracts, generates/funds a testnet key, deploys them, runs the initialization, and automatically updates the `NEXT_PUBLIC_CONTRACT_ID` in your `web/.env.local` file.*
 
-Then **open a new terminal** (so `cargo`/`stellar` land on PATH) and give Rust a
-working linker — pick one:
+5. Run the Next.js development server:
+   ```bash
+   cd web
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000) to view the web application.
 
-**Easiest — GNU toolchain** (no admin, no large download):
+## Network Details
+- **Network:** Stellar Testnet (`stellar:testnet`)
+- **RPC URL:** `https://soroban-testnet.stellar.org`
+- **Horizon URL:** `https://horizon-testnet.stellar.org`
+- **Network Passphrase:** `Test SDF Network ; September 2015`
+- **USDC Issuer Address (Stellar Testnet):** `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`
+- **Contract IDs:**
+  - `likha-escrow`: [Auto-generated and written to `.env.local` upon deployment]
+  - `reflector-mock`: [Auto-generated and written to `.env.local` upon deployment]
 
-```powershell
-rustup default stable-x86_64-pc-windows-gnu
-rustup target add wasm32v1-none
-```
+## Team
+- Venrei Joseph — @usep-f
 
-**Or MSVC** (matches Stellar's docs): install the **Visual C++ Build Tools** (the
-"Desktop development with C++" workload), then:
-
-```powershell
-rustup target add wasm32v1-none
-```
-
-> If `cargo` fails with *"linker `link.exe` not found"*, you skipped the step
-> above — use the GNU toolchain or install the Build Tools.
-
-On macOS/Linux: install Rust from <https://rustup.rs>, run
-`rustup target add wasm32v1-none`, and install the Stellar CLI
-(`brew install stellar-cli`).
-
-## 1. Run the frontend (the part that demos immediately)
-
-```powershell
-cd web
-npm install        # already run if you scaffolded via this repo
-npm run dev
-```
-
-Open <http://localhost:3000>, then:
-
-1. **Connect Freighter** (approve in the extension; make sure it's on Test Net).
-2. **Fund with Friendbot** — your XLM balance jumps to ~10,000.
-3. **Send a payment** to another *existing, funded* testnet account
-   (create one at <https://laboratory.stellar.org/#account-creator?network=test>).
-4. Watch the status go Building → Signing → Submitting → Confirming → Success,
-   then open the **Stellar Expert** link to see it on-chain.
-
-`web/.env.local` is pre-filled with testnet config. `NEXT_PUBLIC_CONTRACT_ID` is
-left empty — the Savings Goal panel shows deploy instructions until you set it.
-
-## 2. Build, test & deploy the Soroban contract
-
-```powershell
-# from the repo root
-cargo test                 # runs the contract unit tests (no network needed)
-
-# deploy to testnet + auto-wire the contract ID into web/.env.local
-.\scripts\deploy.ps1       # macOS/Linux:  ./scripts/deploy.sh
-```
-
-The deploy script will: create+fund a testnet identity (if needed), run
-`stellar contract build`, deploy, initialise the goal (target `1000`), and write
-`NEXT_PUBLIC_CONTRACT_ID` into `web/.env.local`. **Restart `npm run dev`** and the
-**Savings Goal** panel goes live: it reads on-chain progress and lets a connected
-wallet `contribute` (a real signed Soroban transaction).
-
-### The contract (`contracts/savings-goal/src/lib.rs`)
-
-| Function | Purpose |
-|---|---|
-| `init(target: i128)` | Set the savings target (once). |
-| `contribute(amount: i128) -> i128` | Add to the saved total; returns the new total. |
-| `get_state() -> State` | Read `{ saved, target }`. |
-
-It uses plain integer state (no token transfers) so it's bulletproof in a live
-demo. To make it move real money, swap `contribute` to call the XLM/USDC SAC
-`transfer` and store per-user contributions — see CLAUDE.md for the SAC addresses.
-
-## 3. Make it your idea
-
-This is your *starting point*, not the answer. Pick an idea + track from the
-workshop's 300-ideas list (Philippines remittance / payments / financial
-inclusion themes score well), then reshape the components and the contract.
-Good extension paths: transaction history from Horizon, USDC trustline + send,
-a swap via Soroswap, a price feed via Reflector.
-
-For a fully worked example built on this scaffold, see the **Paluwagan** app in
-`..\Stellar-Workshop-PUP-May-2026-EXAMPLE`.
-
-## Troubleshooting
-
-- **Freighter "not detected"** — install it, reload the page, and confirm it's unlocked.
-- **Payment fails `op_no_destination`** — fund the destination account first.
-- **`tx_bad_auth`** — wrong network passphrase; this app uses `Networks.TESTNET`.
-- **Contract panel can't read state** — make sure you deployed *and* ran `init`,
-  and that `NEXT_PUBLIC_CONTRACT_ID` is set, then restart the dev server.
-
-See **CLAUDE.md** for the full list of Stellar gotchas.
+## License
+MIT License
