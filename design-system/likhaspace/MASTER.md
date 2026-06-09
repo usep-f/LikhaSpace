@@ -7,8 +7,8 @@
 ---
 
 **Project:** LikhaSpace
-**Generated:** 2026-06-09 08:55:00
-**Category:** Music Streaming
+**Generated:** 2026-06-09 11:09:19
+**Category:** Cybersecurity Platform
 
 ---
 
@@ -18,24 +18,24 @@
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#1E1B4B` | `--color-primary` |
-| Secondary | `#4338CA` | `--color-secondary` |
+| Primary | `#7C3AED` | `--color-primary` |
+| Secondary | `#A78BFA` | `--color-secondary` |
 | CTA/Accent | `#22C55E` | `--color-cta` |
-| Background | `#0F0F23` | `--color-background` |
-| Text | `#F8FAFC` | `--color-text` |
+| Background | `#FAF5FF` | `--color-background` |
+| Text | `#4C1D95` | `--color-text` |
 
-**Color Notes:** Dark audio + play green
+**Color Notes:** Trust purple + transaction green
 
 ### Typography
 
-- **Heading Font:** Righteous
-- **Body Font:** Poppins
-- **Mood:** music, entertainment, fun, energetic, bold, performance
-- **Google Fonts:** [Righteous + Poppins](https://fonts.google.com/share?selection.family=Poppins:wght@300;400;500;600;700|Righteous)
+- **Heading Font:** Archivo
+- **Body Font:** Space Grotesk
+- **Mood:** minimal, portfolio, designer, creative, clean, artistic
+- **Google Fonts:** [Archivo + Space Grotesk](https://fonts.google.com/share?selection.family=Archivo:wght@300;400;500;600;700|Space+Grotesk:wght@300;400;500;600;700)
 
 **CSS Import:**
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Righteous&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 ```
 
 ### Spacing Variables
@@ -85,8 +85,8 @@
 /* Secondary Button */
 .btn-secondary {
   background: transparent;
-  color: #1E1B4B;
-  border: 2px solid #1E1B4B;
+  color: #7C3AED;
+  border: 2px solid #7C3AED;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -99,7 +99,7 @@
 
 ```css
 .card {
-  background: #0F0F23;
+  background: #FAF5FF;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -125,9 +125,9 @@
 }
 
 .input:focus {
-  border-color: #1E1B4B;
+  border-color: #7C3AED;
   outline: none;
-  box-shadow: 0 0 0 3px #1E1B4B20;
+  box-shadow: 0 0 0 3px #7C3AED20;
 }
 ```
 
@@ -153,28 +153,28 @@
 
 ## Style Guidelines
 
-**Style:** Vibrant & Block-based
+**Style:** Cyberpunk UI
 
-**Keywords:** Bold, energetic, playful, block layout, geometric shapes, high color contrast, duotone, modern, energetic
+**Keywords:** Neon, dark mode, terminal, HUD, sci-fi, glitch, dystopian, futuristic, matrix, tech noir
 
-**Best For:** Startups, creative agencies, gaming, social media, youth-focused, entertainment, consumer
+**Best For:** Gaming platforms, tech products, crypto apps, sci-fi applications, developer tools, entertainment
 
-**Key Effects:** Large sections (48px+ gaps), animated patterns, bold hover (color shift), scroll-snap, large type (32px+), 200-300ms
+**Key Effects:** Neon glow (text-shadow), glitch animations (skew/offset), scanlines (::before overlay), terminal fonts
 
 ### Page Pattern
 
-**Pattern Name:** App Store Style Landing
+**Pattern Name:** Marketplace / Directory
 
-- **Conversion Strategy:** Show real screenshots. Include ratings (4.5+ stars). QR code for mobile. Platform-specific CTAs.
-- **CTA Placement:** Download buttons prominent (App Store + Play Store) throughout
-- **Section Order:** 1. Hero with device mockup, 2. Screenshots carousel, 3. Features with icons, 4. Reviews/ratings, 5. Download CTAs
+- **Conversion Strategy:**  map hover pins,  card carousel, Search bar is the CTA. Reduce friction to search. Popular searches suggestions.
+- **CTA Placement:** Hero Search Bar + Navbar 'List your item'
+- **Section Order:** 1. Hero (Search focused), 2. Categories, 3. Featured Listings, 4. Trust/Safety, 5. CTA (Become a host/seller)
 
 ---
 
 ## Anti-Patterns (Do NOT Use)
 
-- ❌ Flat design without depth
-- ❌ Text-heavy pages
+- ❌ Light mode
+- ❌ Poor data viz
 
 ### Additional Forbidden Patterns
 

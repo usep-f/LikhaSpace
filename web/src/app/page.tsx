@@ -1,8 +1,26 @@
+'use client';
+
+import React, { useState } from 'react';
+import { HeroSection } from '@/components/HeroSection';
+import { ValueProps } from '@/components/ValueProps';
+import { RoleModal } from '@/components/RoleModal';
+
 export default function Home() {
+  const [searchVal, setSearchVal] = useState<string>('');
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-zinc-950 text-zinc-50">
-      <h1 className="text-4xl font-bold tracking-tight">Clean Slate</h1>
-      <p className="mt-4 text-zinc-400">Ready for your Stellar / Soroban application.</p>
-    </main>
+    <div className="min-h-screen bg-obsidian text-white scanlines">
+      {/* Onboarding role selection modal */}
+      <RoleModal />
+
+      {/* Hero Header block */}
+      <HeroSection 
+        searchVal={searchVal} 
+        onSearchChange={setSearchVal} 
+      />
+
+      {/* Platform features grid */}
+      <ValueProps />
+    </div>
   );
 }

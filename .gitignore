@@ -50,5 +50,10 @@ $RECYCLE.BIN/
 AGENTS.md
 CLAUDE.md
 .agent/
+agent rules
 /feature-list/
+
+# Private developer files (gitignored — not for commit)
+TODO.md
+/design-system/
 

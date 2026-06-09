@@ -1,1 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
 @import "tailwindcss";
+
+@theme {
+  --color-obsidian: #0B0813;
+  --color-violet-dark: #140E26;
+  --color-hotpink: #FF007F;
+  --color-neoncyan: #00F3FF;
+  --color-neongreen: #39FF14;
+
+  --font-sans: 'Space Grotesk', sans-serif;
+  --font-heading: 'Archivo', sans-serif;
+}
+
+/* Global resets and styles */
+:root {
+  color-scheme: dark;
+  background-color: var(--color-obsidian);
+  color: #F3F4F6;
+  font-family: var(--font-sans);
+}
+
+body {
+  background-color: var(--color-obsidian);
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(124, 58, 237, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(255, 0, 127, 0.05) 0%, transparent 40%);
+  background-attachment: fixed;
+  min-h-screen: 100vh;
+  overflow-x: hidden;
+}
+
+/* Custom cyberpunk effects */
+.neon-border-pink {
+  border: 1px solid var(--color-hotpink);
+  box-shadow: 0 0 10px rgba(255, 0, 127, 0.25), inset 0 0 10px rgba(255, 0, 127, 0.1);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neon-border-pink:hover {
+  box-shadow: 0 0 16px rgba(255, 0, 127, 0.45), inset 0 0 14px rgba(255, 0, 127, 0.15);
+}
+
+.neon-border-cyan {
+  border: 1px solid var(--color-neoncyan);
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.25), inset 0 0 10px rgba(0, 243, 255, 0.1);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neon-border-cyan:hover {
+  box-shadow: 0 0 16px rgba(0, 243, 255, 0.45), inset 0 0 14px rgba(0, 243, 255, 0.15);
+}
+
+.neon-border-green {
+  border: 1px solid var(--color-neongreen);
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.25), inset 0 0 10px rgba(57, 255, 20, 0.1);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neon-border-green:hover {
+  box-shadow: 0 0 16px rgba(57, 255, 20, 0.45), inset 0 0 14px rgba(57, 255, 20, 0.15);
+}
+
+.text-glow-pink {
+  text-shadow: 0 0 8px rgba(255, 0, 127, 0.6);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 8px rgba(0, 243, 255, 0.6);
+}
+
+.text-glow-green {
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
+}
+
+/* Glassmorphism containers */
+.glass-card {
+  background: rgba(20, 14, 38, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  background: rgba(20, 14, 38, 0.85);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Scanlines overlay (very subtle) */
+.scanlines {
+  position: relative;
+}
+
+.scanlines::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%);
+  background-size: 100% 4px;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-obsidian);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 0, 127, 0.2);
+  border-radius: 4px;
+  border: 2px solid var(--color-obsidian);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 0, 127, 0.5);
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-obsidian), 0 0 0 4px var(--color-neoncyan) !important;
+}
