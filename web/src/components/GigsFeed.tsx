@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { mockGigs, Gig } from '@/lib/mockGigs';
 import { Tag, HelpCircle, ArrowUpRight, Star } from 'lucide-react';
 
@@ -20,13 +20,11 @@ const StatusBadge: React.FC<{ status: Gig['status'] }> = ({ status }) => {
 // Sub-component: Gig Card
 interface CardProps {
   gig: Gig;
-  xlmRate: number;
   onBookClick: (gig: Gig) => void;
   onProfileClick: (address: string) => void;
 }
 
-const GigCard: React.FC<CardProps> = ({ gig, xlmRate, onBookClick, onProfileClick }) => {
-  const xlmBudget = Math.round(gig.priceUSD * xlmRate);
+const GigCard: React.FC<CardProps> = ({ gig,  onBookClick, onProfileClick }) => {
   
   return (
     <div className={`p-6 rounded-xl glass-card border flex flex-col justify-between space-y-4 transition-all ${
@@ -147,18 +145,6 @@ interface GigsFeedProps {
 
 export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onProfileClick, onBookClick }) => {
   const [activeTab, setActiveTab] = useState<string>('all');
-  const [xlmRate, setXlmRate] = useState<number>(9.09);
-
-  useEffect(() => {
-    fetch('https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.stellar?.usd) {
-          setXlmRate(1 / data.stellar.usd);
-        }
-      })
-      .catch((err) => console.log('CoinGecko fetch failed, using fallback rate:', err));
-  }, []);
 
   const filteredGigs = mockGigs.filter((gig) => {
     const matchesCategory = activeTab === 'all' || gig.category === activeTab;
@@ -190,7 +176,6 @@ export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onProfileClick, o
             <GigCard
               key={gig.id}
               gig={gig}
-              xlmRate={xlmRate}
               onBookClick={onBookClick}
               onProfileClick={onProfileClick}
             />
