@@ -13,6 +13,12 @@ export interface UserProfile {
   phone: string;
   title?: string;
   bio?: string;
+  category?: string;
+  careerPath?: string;
+  github?: string;
+  linkedin?: string;
+  twitter?: string;
+  portfolio?: string;
 }
 
 interface WalletContextProps {
@@ -65,6 +71,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             phone: data.phone || '',
             title: data.title || '',
             bio: data.bio || '',
+            category: data.category || '',
+            careerPath: data.careerPath || '',
+            github: data.github || '',
+            linkedin: data.linkedin || '',
+            twitter: data.twitter || '',
+            portfolio: data.portfolio || '',
           };
           setUserProfile(profile);
           setIsRegistered(true);
