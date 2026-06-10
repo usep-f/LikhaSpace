@@ -1,101 +1,55 @@
 # LikhaSpace
 
-LikhaSpace is a decentralized, trustless freelance marketplace for Filipino creatives and global clients, featuring automated smart contract escrows, zero platform extraction fees, and immutable on-chain reputation tracking.
+LikhaSpace is a decentralized, trustless freelance marketplace for Filipino creatives and global clients. It operates on a "Service Listing" (Fiverr-style) model, featuring automated smart contract escrows, zero platform extraction fees, and immutable on-chain reputation tracking.
 
 ## Problem
-In the Philippines, the freelance and creative economy is a vital source of income. However, traditional freelance platforms extract heavy toll fees (ranging from 10% to 20% of hard-earned income), require slow, centralized payout procedures, and pose constant payment security risks for both clients and freelancers. Creatives face client payment defaults, while clients risk paying upfront for undelivered or substandard work. There is a critical need for a localized, trustless payment gateway that secures agreements without middleman extraction fees or geographic payment processing delays.
+In the Philippines, the freelance and creative economy is a vital source of income. However, traditional freelance platforms extract heavy toll fees (ranging from 10% to 20% of hard-earned income), require slow, centralized payout procedures, and pose constant payment security risks for both clients and freelancers. Creatives face client payment defaults, while clients risk paying upfront for undelivered or substandard work.
+
+## The Solution: A Service Marketplace
+LikhaSpace flips the traditional bidding model. Instead of clients posting jobs and freelancers competing in a race to the bottom, **Freelancers post their services** (e.g., "I will design a 3D asset for $100"). Clients browse these services, review the freelancer's on-chain reliability, and book them directly.
 
 ## How It Works
-1. **Onboarding:** Users connect their Freighter wallet on the Stellar Testnet and choose their role as either a **Client**, an **Artist**, or a **Mediator**.
-2. **Posting a Gig:** A Client posts a freelance project by specifying the project details, budget in USD (automatically converted to XLM using an on-chain Reflector oracle), the selected freelancer's address, and an upfront payment percentage (0% to 50%).
-3. **Escrow Funding:** The Client funds and initializes the escrow by submitting a Soroban contract transaction. Up to 50% of the budget is dispatched instantly as an upfront payment to the Artist, while the remaining balance is locked in the `likha-escrow` smart contract.
-4. **Deliverable Submission:** The Artist completes the work and submits the proof of delivery (e.g., a link to the project deliverables), logging the work link directly into the contract state.
+1. **Service Listings:** Freelancers create listings defining their service, price (in USD), and required upfront payment percentage (0-50%). These are indexed in Firebase.
+2. **Booking & Approval:** A Client finds a listing they like and sends a booking request. The Freelancer receives this request and can choose to **Accept** or **Deny** (with an optional denial message). Once accepted, that specific listing becomes temporarily *invisible/occupied* so the Freelancer can focus solely on that client.
+3. **Escrow Funding:** Upon acceptance, the Client funds the escrow by submitting a Soroban contract transaction. The USD price is automatically converted to live XLM value using a Reflector testnet oracle. The upfront payment is instantly dispatched to the Freelancer, and the remaining balance is locked in the `likha-escrow` smart contract.
+4. **Deliverables & Chat:** Clients and Freelancers can communicate via an off-chain chat (stored in Firebase). The Freelancer submits the final work deliverables through the dashboard.
 5. **Release or Dispute:**
-   - **Happy Path:** The Client reviews the deliverable and releases the remaining locked balance directly to the Artist's wallet via a smart contract call.
-   - **Dispute Path:** If a conflict arises, either party can file a dispute, routing the escrow to a decentralized Mediator. The Mediator uses a slider interface to configure a settlement split (Artist % vs. Client %) and executes the resolution transaction (with a 2.5% platform fee routed to the protocol).
-6. **Reputation Tracking:** Once a gig is completed, the contract updates the Artist's on-chain stats (completed project count and total XLM earned), providing an immutable rating score.
+   - **Happy Path:** The Client reviews the deliverable and releases the remaining locked balance directly to the Freelancer via a smart contract call.
+   - **Dispute Path:** If a conflict arises, either party can file a dispute, routing the escrow to a decentralized Mediator for a settlement split.
+6. **Reputation Tracking:** Once a gig is completed, the Freelancer receives a Star Rating and Testimonial. This off-chain data is paired with their immutable on-chain stats (completed project count and total XLM earned) to prove absolute reliability.
 
-## How It Uses Stellar
-Stellar is the core engine of LikhaSpace:
-- **Soroban Smart Contracts:** The `likha-escrow` Rust contract secures the freelance agreements. It locks the funds in escrow, releases upfront payments, logs deliverables, and handles dispute resolution splits on-chain.
-- **XLM Payments:** Used for paying freelancers, funding escrows, and paying low, predictable network transaction fees (less than $0.0001 per transaction).
-- **Price Oracles (Reflector):** The `reflector-mock` contract mocks/interacts with Reflector price feeds to convert Client-inputted USD budgets into the exact amount of XLM required for escrow lockups.
-- **On-Chain Identity & Freighter Wallet:** Users sign transactions securely using the Freighter wallet, and their public keys double as their unique identifiers on the platform.
-- **Horizon & RPC API:** Used to query account balances, transaction histories, and listen to on-chain events and contract states.
+## System Architecture
 
-## Track
-Financial Inclusion / Remittance
+### Role of Firebase
+While LikhaSpace uses Stellar for payments and escrow, **Firebase Firestore** acts as the high-speed backend for off-chain platform data:
+- **Indexing Listings:** Stores the catalog of Freelancer services (Title, Description, Tags, Price) so the frontend can quickly filter and search.
+- **User Metadata:** Stores off-chain profile information, Star Ratings, and Testimonials.
+- **Messaging/Chat:** Stores the chat history and booking denial messages between Clients and Freelancers.
+- **State Management:** Tracks the "Occupied/Invisible" status of listings so they are hidden from the marketplace while a gig is active.
+
+### Role of the Smart Contracts
+- **`likha-escrow`:** The core Soroban Rust contract. Locks the funds, handles the automatic upfront splits, and executes final release or Mediator dispute resolutions.
+- **`reflector-mock` (Oracle):** Integrates with Reflector price feeds on the testnet. When a Client is ready to fund a $100 USD gig, the contract queries the Oracle to calculate the exact real-time equivalent in XLM to ensure accurate escrow lockups.
 
 ## Tech Stack
 - **Framework:** Next.js 16 (React 19, TypeScript)
-- **Stellar SDK:** `@stellar/stellar-sdk` v15.1.0
-- **Wallet Integration:** `@stellar/freighter-api` v6.0.1
+- **Stellar SDK:** `@stellar/stellar-sdk` v15.1.0, `@stellar/freighter-api` v6.0.1
 - **Network:** Stellar Testnet
-- **Database:** Firebase Firestore (v12.14.0) for indexing and caching active listings and user metadata
+- **Database:** Firebase Firestore (v12.14.0)
 - **Styling:** Tailwind CSS v4 and Lucide React Icons
 
 ## Setup & Run
 ### Prerequisites
-- **Node.js 20+** and **npm**
-- **Freighter Browser Extension** configured to the **Test Net**
-- **Rust** and **Stellar CLI** (required for building and deploying smart contracts)
+- Node.js 20+ and npm
+- Freighter Browser Extension (Test Net)
+- Rust and Stellar CLI
 
 ### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/usep-f/LikhaSpace.git
-   cd LikhaSpace
-   ```
-
-2. Install the web frontend dependencies:
-   ```bash
-   cd web
-   npm install
-   ```
-
-3. Set up the environment variables:
-   Create a `web/.env.local` file (or update the existing `web/.env` file) with the following environment variables:
-   ```env
-   NEXT_PUBLIC_STELLAR_NETWORK=testnet
-   NEXT_PUBLIC_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
-   NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
-   NEXT_PUBLIC_CONTRACT_ID=
-   
-   # Firebase Web Config (Paste yours here)
-   NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyBNicL0JJlvlrW0bggL-_-1QuXF6Jx-oCE
-   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=likhaspace-dfd01.firebaseapp.com
-   NEXT_PUBLIC_FIREBASE_PROJECT_ID=likhaspace-dfd01
-   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=likhaspace-dfd01.firebasestorage.app
-   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=164171081717
-   NEXT_PUBLIC_FIREBASE_APP_ID=1:164171081717:web:642b85a357eb8787b1a2bc
-   ```
-
-4. Build and deploy the smart contracts to Testnet (Windows):
-   ```powershell
-   # From the root directory, run the deploy script:
-   .\scripts\deploy.ps1
-   ```
-   *Note: This compiles the contracts, generates/funds a testnet key, deploys them, runs the initialization, and automatically updates the `NEXT_PUBLIC_CONTRACT_ID` in your `web/.env.local` file.*
-
-5. Run the Next.js development server:
-   ```bash
-   cd web
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) to view the web application.
-
-## Network Details
-- **Network:** Stellar Testnet (`stellar:testnet`)
-- **RPC URL:** `https://soroban-testnet.stellar.org`
-- **Horizon URL:** `https://horizon-testnet.stellar.org`
-- **Network Passphrase:** `Test SDF Network ; September 2015`
-- **USDC Issuer Address (Stellar Testnet):** `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`
-- **Contract IDs:**
-  - `likha-escrow`: [Auto-generated and written to `.env.local` upon deployment]
-  - `reflector-mock`: [Auto-generated and written to `.env.local` upon deployment]
-
-## Team
-- Venrei Joseph — @usep-f
+1. `git clone https://github.com/usep-f/LikhaSpace.git`
+2. `cd LikhaSpace/web && npm install`
+3. Set up `web/.env.local` (See repo for required variables)
+4. Deploy contracts: `.\scripts\deploy.ps1`
+5. Run frontend: `npm run dev`
 
 ## License
 MIT License
