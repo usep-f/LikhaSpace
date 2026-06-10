@@ -33,7 +33,7 @@ export const StepSuccess: React.FC<StepProps> = ({ formData, onNext }) => {
 
       <div className="pt-8 w-full max-w-sm">
         <button 
-          onClick={onNext}
+          onClick={() => onNext()}
           className="w-full flex items-center justify-center gap-2 px-8 py-3 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90 hover:-translate-y-0.5 transition-all duration-300 shadow-[0_0_20px_rgba(34,197,94,0.4)]"
         >
           <Rocket className="w-5 h-5" />

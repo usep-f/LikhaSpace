@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWallet } from '../context/WalletContext';
+import { useWallet, UserRole } from '../context/WalletContext';
 import { useNotification } from '../context/NotificationContext';
 import { OnboardingFormData } from './onboarding/types';
 import { StepRole } from './onboarding/StepRole';
@@ -136,7 +136,7 @@ export default function ProfileRegistrationModal() {
   const brandGlowClass = isClient ? 'shadow-[0_0_10px_rgba(0,243,255,0.4)]' : 'shadow-[0_0_10px_rgba(255,0,127,0.4)]';
 
   return (
-    <div className="fixed inset-0 z-[100] bg-obsidian/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-100 bg-obsidian/90 backdrop-blur-md flex items-center justify-center p-4">
       <div className="bg-violet-dark/95 rounded-2xl shadow-2xl w-full max-w-3xl border border-white/10 min-h-[580px] md:min-h-[600px] max-h-[90vh] overflow-hidden flex flex-col relative">
         
         {/* Header with visual step counter */}
@@ -204,7 +204,7 @@ export default function ProfileRegistrationModal() {
             
             {currentStep === 5 ? (
               <button 
-                onClick={handleNext} 
+                onClick={() => handleNext()} 
                 disabled={!isStep5Valid}
                 className={`px-8 py-2 rounded-lg font-semibold transition-all duration-200 cursor-pointer ${
                   !isStep5Valid 
@@ -216,7 +216,7 @@ export default function ProfileRegistrationModal() {
               </button>
             ) : (currentStep === 2) ? (
               <button 
-                onClick={handleNext} 
+                onClick={() => handleNext()} 
                 disabled={!isStep2Valid}
                 className={`px-8 py-2 rounded-lg font-semibold transition-all duration-200 cursor-pointer ${
                   !isStep2Valid 

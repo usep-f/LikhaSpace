@@ -8,5 +8,13 @@ service cloud.firestore {
       // Allow writes to the user document for registration, updates, and soft deletion
       allow write: if true;
     }
+    
+    match /gigs/{gigId} {
+      allow read, write: if true;
+    }
+    
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
   }
 }

@@ -1,6 +1,7 @@
-import React from 'react';
-import { FreelancerProfile, mockOrders } from '@/lib/mockGigs';
+import React, { useState, useEffect } from 'react';
+import { FreelancerProfile, Order } from '@/lib/mockGigs';
 import { X, Star, CheckCircle, ShieldCheck, ExternalLink } from 'lucide-react';
+import { getFreelancerOrders } from '@/lib/db';
 
 interface ProfileModalProps {
   profile: FreelancerProfile;
@@ -8,12 +9,19 @@ interface ProfileModalProps {
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose }) => {
-  const completedOrdersWithReviews = mockOrders.filter(
-    o => o.freelancerAddress === profile.address && o.status === 'completed' && o.review
-  );
+  const [completedOrdersWithReviews, setCompletedOrdersWithReviews] = useState<Order[]>([]);
+
+  useEffect(() => {
+    getFreelancerOrders(profile.address)
+      .then((orders) => {
+        const withReviews = orders.filter(o => o.status === 'completed' && o.review);
+        setCompletedOrdersWithReviews(withReviews);
+      })
+      .catch(console.error);
+  }, [profile.address]);
 
   const allReviews = [
-    ...profile.testimonials.map(t => ({ id: t.id, clientName: t.clientName, rating: t.rating, text: t.text, txHash: undefined })),
+    ...(profile.testimonials || []).map(t => ({ id: t.id, clientName: t.clientName, rating: t.rating, text: t.text, txHash: undefined })),
     ...completedOrdersWithReviews.map(o => ({
       id: o.id,
       clientName: o.clientName,
