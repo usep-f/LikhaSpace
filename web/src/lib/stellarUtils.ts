@@ -7,8 +7,19 @@ import {
 import * as Freighter from '@stellar/freighter-api';
 import { server, NETWORK_PASSPHRASE } from './stellar';
 
+async function validateActiveWallet(expectedAddr: string): Promise<void> {
+  const freighterInfo = await Freighter.getAddress();
+  const activeAddr = freighterInfo?.address;
+  if (activeAddr && activeAddr !== expectedAddr) {
+    throw new Error(
+      `Wallet account mismatch: Active Freighter account is ${activeAddr}, but this action requires ${expectedAddr}. Please switch accounts in Freighter.`
+    );
+  }
+}
+
 export async function submitTransaction(txBuilder: TransactionBuilder) {
   const tx = txBuilder.setTimeout(100).build();
+  await validateActiveWallet(tx.source);
   const simResponse = await server.simulateTransaction(tx);
   if (rpc.Api.isSimulationError(simResponse)) {
     throw new Error(`Simulation failed: ${simResponse.error}`);
