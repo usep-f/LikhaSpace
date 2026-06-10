@@ -9,10 +9,11 @@ const StatusBadge: React.FC<{ status: Gig['status'] }> = ({ status }) => {
   const styles = {
     active: 'bg-neongreen/10 text-neongreen border-neongreen/20 text-glow-green',
     occupied: 'bg-white/10 text-white border-white/20',
+    paused: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
   };
   return (
     <span className={`px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider border ${styles[status]}`}>
-      {status === 'active' ? 'Available' : 'Occupied'}
+      {status === 'active' ? 'Available' : status === 'occupied' ? 'Occupied' : 'Paused'}
     </span>
   );
 };
