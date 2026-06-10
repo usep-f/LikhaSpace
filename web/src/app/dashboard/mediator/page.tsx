@@ -25,7 +25,7 @@ const SplitSlider: React.FC<SplitConfigProps> = ({ split, onSplitChange }) => (
     <p className="text-xs text-gray-300 font-bold">Proposed Settlement Split</p>
     <div className="space-y-2">
       <div className="flex justify-between text-xs font-mono text-white">
-        <span>Artist: {split}%</span>
+        <span>Freelancer: {split}%</span>
         <span>Client: {100 - split}%</span>
       </div>
       <input

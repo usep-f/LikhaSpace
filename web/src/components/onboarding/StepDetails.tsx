@@ -3,8 +3,9 @@ import { StepProps } from './types';
 import { useWallet } from '@/context/WalletContext';
 import { fetchWalletStats, verifyWallet, WalletStats, DEFAULT_RULES } from '@/lib/stellarVerification';
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { onboardingSchema, sanitizeInput } from '@/lib/validation';
 
-export const StepDetails: React.FC<StepProps> = ({ formData, updateData, onNext, onBack }) => {
+export const StepDetails: React.FC<StepProps> = ({ formData, updateData, onValidityChange }) => {
   const { address } = useWallet();
   const [stats, setStats] = useState<WalletStats | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -33,13 +34,24 @@ export const StepDetails: React.FC<StepProps> = ({ formData, updateData, onNext,
   }, [checkWallet]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    updateData({ [e.target.name]: e.target.value });
+    updateData({ [e.target.name]: sanitizeInput(e.target.value) });
   };
 
-  const isValid = formData.name.trim() !== '' && formData.email.trim() !== '' && formData.phone.trim() !== '' && verificationResult?.isVerified;
+  const detailsSchema = onboardingSchema.pick({ name: true, email: true, phone: true });
+  const isFormValid = detailsSchema.safeParse({
+    name: formData.name,
+    email: formData.email,
+    phone: formData.phone,
+  }).success;
+
+  const isValid = isFormValid && !!verificationResult?.isVerified;
+
+  useEffect(() => {
+    onValidityChange?.(isValid);
+  }, [isValid, onValidityChange]);
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+    <div className="space-y-6 animate-step-pop">
       <div className="text-center mb-6">
         <h2 className="font-heading text-2xl font-bold text-white mb-2">Account Details</h2>
         <p className="text-sm text-gray-400">Enter your credentials to secure your profile.</p>
@@ -49,15 +61,15 @@ export const StepDetails: React.FC<StepProps> = ({ formData, updateData, onNext,
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">Full Name *</label>
-            <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200" placeholder="Juan Dela Cruz" />
+             <input required type="text" name="name" maxLength={50} value={formData.name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200" placeholder="Juan Dela Cruz" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">Email *</label>
-            <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200" placeholder="juan@example.com" />
+            <input required type="email" name="email" maxLength={100} value={formData.email} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200" placeholder="juan@example.com" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">Phone *</label>
-            <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200" placeholder="+63 900 000 0000" />
+            <input required type="tel" name="phone" maxLength={20} value={formData.phone} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200" placeholder="+63 900 000 0000" />
           </div>
         </div>
 
@@ -115,18 +127,6 @@ export const StepDetails: React.FC<StepProps> = ({ formData, updateData, onNext,
         </div>
       </div>
 
-      <div className="flex justify-between pt-6 border-t border-slate-700">
-        <button onClick={onBack} className="px-6 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800 transition-colors">
-          Back
-        </button>
-        <button 
-          onClick={onNext} 
-          disabled={!isValid}
-          className={`px-8 py-2 rounded-lg font-semibold transition-all duration-200 ${isValid ? 'bg-primary text-white hover:bg-primary/90 hover:-translate-y-0.5' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
-        >
-          Continue
-        </button>
-      </div>
     </div>
   );
 };

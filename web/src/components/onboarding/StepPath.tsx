@@ -10,7 +10,7 @@ const CAREER_PATHS: Record<string, string[]> = {
   business: ['Social Media Manager', 'Digital Marketer', 'Virtual Assistant', 'Project Manager', 'SEO Consultant'],
 };
 
-export const StepPath: React.FC<StepProps> = ({ formData, updateData, onNext, onBack }) => {
+export const StepPath: React.FC<StepProps> = ({ formData, updateData, onNext }) => {
   const paths = CAREER_PATHS[formData.category] || [];
   const selectedCategoryLabel = CATEGORIES.find(c => c.id === formData.category)?.label || '';
 
@@ -20,7 +20,7 @@ export const StepPath: React.FC<StepProps> = ({ formData, updateData, onNext, on
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+    <div className="space-y-6 animate-step-pop">
       <div className="text-center mb-8">
         <h2 className="font-heading text-2xl font-bold text-white mb-2">What is your specialty?</h2>
         <p className="text-sm text-gray-400">Select your specific career path in {selectedCategoryLabel}.</p>
@@ -45,11 +45,7 @@ export const StepPath: React.FC<StepProps> = ({ formData, updateData, onNext, on
         })}
       </div>
 
-      <div className="flex justify-between pt-6 border-t border-slate-700 mt-6">
-        <button onClick={onBack} className="px-6 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800 transition-colors">
-          Back
-        </button>
-      </div>
+
     </div>
   );
 };
