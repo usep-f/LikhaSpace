@@ -4,9 +4,11 @@ import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
 import { Sparkles, PlusCircle, Check, X, Eye } from 'lucide-react';
-import { mockGigs, mockOrders, Order, Gig } from '@/lib/mockGigs';
+import { Order, Gig, FreelancerProfile } from '@/lib/mockGigs';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
+import { subscribeToFreelancerOrders, updateOrderStatus, createGig, getFreelancerGigs, getUserProfile, getFreelancerOrders } from '@/lib/db';
+import { submitDeliverable } from '@/lib/contract';
 import { ProposalModal } from '@/components/ProposalModal';
 import { ListingModal } from '@/components/ListingModal';
 
@@ -42,7 +44,8 @@ const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void
 
 // Listings View
 const ListingsView: React.FC = () => {
-  const allMyGigs = mockGigs.filter(g => g.freelancerAddress === 'GDX7...R39P');
+  const { address } = useWallet();
+  const [gigs, setGigs] = useState<Gig[]>([]);
   const { showToast } = useNotification();
 
   const [search, setSearch] = useState('');
@@ -54,7 +57,22 @@ const ListingsView: React.FC = () => {
   const [isListingModalOpen, setIsListingModalOpen] = useState(false);
   const [editingGig, setEditingGig] = useState<Gig | null>(null);
 
-  const filteredGigs = allMyGigs.filter(gig => {
+  const loadGigs = React.useCallback(async () => {
+    if (!address) return;
+    try {
+      const res = await getFreelancerGigs(address);
+      setGigs(res);
+    } catch (err) {
+      console.error('Failed to load gigs:', err);
+    }
+  }, [address]);
+
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadGigs();
+  }, [loadGigs]);
+
+  const filteredGigs = gigs.filter(gig => {
     const matchesSearch = gig.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || gig.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -80,10 +98,36 @@ const ListingsView: React.FC = () => {
     setIsListingModalOpen(true);
   };
 
-  const handleSaveListing = (updatedGig: Partial<Gig>) => {
-    console.log('Saved listing data:', updatedGig);
-    showToast('Listing saved successfully! (Mock Action)', 'success');
-    setIsListingModalOpen(false);
+  const handleSaveListing = async (updatedGig: Partial<Gig>) => {
+    if (!address) return showToast('Wallet not connected', 'error');
+    showToast('Saving service listing...', 'info');
+    try {
+      const profile = await getUserProfile(address);
+      const freelancerName = profile?.name || 'Freelancer';
+
+      const gigId = editingGig?.id || crypto.randomUUID();
+      const gig: Gig = {
+        id: gigId,
+        freelancerAddress: address,
+        freelancerName,
+        title: updatedGig.title || '',
+        category: updatedGig.category || 'design',
+        description: updatedGig.description || '',
+        priceUSD: updatedGig.priceUSD || 100,
+        upfrontPercentage: updatedGig.upfrontPercentage || 20,
+        tags: updatedGig.tags || [],
+        status: updatedGig.status || 'active',
+        milestones: updatedGig.milestones || [],
+      };
+      await createGig(gig);
+      await loadGigs();
+      showToast('Listing saved successfully!', 'success');
+      setIsListingModalOpen(false);
+    } catch (e: unknown) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Failed to save listing: ${msg}`, 'error');
+    }
   };
 
   return (
@@ -160,7 +204,18 @@ const ListingsView: React.FC = () => {
 
 // Orders View
 const OrdersView: React.FC = () => {
-  const myOrders = mockOrders.filter(o => o.freelancerAddress === 'GDX7...R39P');
+  const { address } = useWallet();
+  const [myOrders, setMyOrders] = useState<Order[]>([]);
+
+  React.useEffect(() => {
+    if (!address) return;
+    const unsubscribe = subscribeToFreelancerOrders(address, (orders) => {
+      setMyOrders(orders);
+    });
+    return () => unsubscribe();
+  }, [address]);
+
+  const { showToast } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -179,6 +234,31 @@ const OrdersView: React.FC = () => {
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const handleAcceptBooking = async (orderId: string) => {
+    showToast('Accepting booking request...', 'info');
+    try {
+      await updateOrderStatus(orderId, { status: 'awaiting_funding' });
+      showToast('Booking accepted! Waiting for client to fund the escrow.', 'success');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Error accepting booking: ${msg}`, 'error');
+    }
+  };
+
+  const handleSubmitDeliverable = async (order: Order) => {
+    if (!order.txHash || !address) return showToast('Error: Missing contract data or wallet address', 'error');
+    showToast('Submitting deliverables on-chain...', 'info');
+    try {
+      await submitDeliverable(order.txHash, address);
+      await updateOrderStatus(order.id, { status: 'delivered' });
+      showToast('Deliverables successfully submitted to the escrow contract!', 'success');
+    } catch (e: unknown) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Submission failed: ${msg}`, 'error');
+    }
+  };
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -235,7 +315,10 @@ const OrdersView: React.FC = () => {
                        >
                          <Eye className="w-4 h-4" /> View Proposal
                        </button>
-                       <button className="px-4 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer">
+                       <button
+                         onClick={() => handleAcceptBooking(order.id)}
+                         className="px-4 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                       >
                          <Check className="w-4 h-4" /> Accept
                        </button>
                        <button
@@ -261,6 +344,14 @@ const OrdersView: React.FC = () => {
                    )
                  ) : (
                    <div className="flex gap-2">
+                     {order.status === 'escrow_funded' && (
+                       <button
+                         onClick={() => handleSubmitDeliverable(order)}
+                         className="px-4 py-2 rounded bg-neoncyan border border-neoncyan/30 text-obsidian font-heading font-bold text-xs uppercase hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)]"
+                       >
+                         Submit Deliverable
+                       </button>
+                     )}
                      <button className="px-4 py-2 rounded bg-white/5 border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors cursor-pointer">
                        Open Workspace
                      </button>
@@ -294,14 +385,24 @@ const OrdersView: React.FC = () => {
 
 // History View
 const HistoryView: React.FC = () => {
-  const myCompletedOrders = mockOrders.filter(o => o.freelancerAddress === 'GDX7...R39P' && o.status === 'completed');
+  const { address } = useWallet();
+  const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
+
+  React.useEffect(() => {
+    if (!address) return;
+    getFreelancerOrders(address)
+      .then(orders => {
+        setCompletedOrders(orders.filter(o => o.status === 'completed'));
+      })
+      .catch(console.error);
+  }, [address]);
 
   return (
     <div className="space-y-6">
       <h3 className="font-heading font-bold text-lg text-white">Transaction History</h3>
       <div className="space-y-4">
-        {myCompletedOrders.length > 0 ? (
-          myCompletedOrders.map(order => (
+        {completedOrders.length > 0 ? (
+          completedOrders.map(order => (
             <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col gap-4">
                <div className="flex justify-between items-start">
                  <div>
@@ -415,8 +516,36 @@ const ProfileSettingsView: React.FC = () => {
 };
 
 export default function ArtistDashboard() {
-  const { isConnected } = useWallet();
+  const { isConnected, address } = useWallet();
   const [activeTab, setActiveTab] = useState('listings');
+  const [profile, setProfile] = useState<FreelancerProfile | null>(null);
+
+  React.useEffect(() => {
+    if (!address) return;
+    getUserProfile(address)
+      .then((p) => {
+        if (p) {
+          setProfile({
+            address,
+            name: p.name || 'Anonymous',
+            title: p.title || '',
+            bio: p.bio || '',
+            totalEarnedXLM: p.totalEarnedXLM || 0,
+            projectsCompleted: p.projectsCompleted || 0,
+            averageRating: p.averageRating || 5.0,
+            testimonials: p.testimonials || [],
+          });
+        } else {
+          setProfile(null);
+        }
+      })
+      .catch(console.error);
+  }, [address]);
+
+  // Calculate dynamic stats
+  const totalEarned = profile?.totalEarnedXLM || 0;
+  const completed = profile?.projectsCompleted || 0;
+  const rating = profile?.averageRating || 5.0;
 
   return (
     <div className="min-h-screen bg-obsidian text-white py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -433,9 +562,9 @@ export default function ArtistDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <ReputationStatCard label="Total XLM Earned" value="12,500 XLM" colorClass="text-glow-green text-neongreen" />
-        <ReputationStatCard label="Gigs Completed" value="24 Projects" colorClass="text-glow-pink text-hotpink" />
-        <ReputationStatCard label="On-Chain Reputation" value="4.9 Rating" colorClass="text-glow-cyan text-neoncyan" />
+        <ReputationStatCard label="Total XLM Earned" value={`${totalEarned.toLocaleString()} XLM`} colorClass="text-glow-green text-neongreen" />
+        <ReputationStatCard label="Gigs Completed" value={`${completed} Projects`} colorClass="text-glow-pink text-hotpink" />
+        <ReputationStatCard label="On-Chain Reputation" value={`${rating.toFixed(1)} Rating`} colorClass="text-glow-cyan text-neoncyan" />
       </div>
 
       <div className="mt-8">

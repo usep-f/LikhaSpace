@@ -1,6 +1,7 @@
-import React from 'react';
-import { Order, mockGigs } from '@/lib/mockGigs';
+import React, { useState, useEffect } from 'react';
+import { Order, Gig } from '@/lib/mockGigs';
 import { X, User, Briefcase, FileText } from 'lucide-react';
+import { getGig } from '@/lib/db';
 
 interface ProposalModalProps {
   order: Order;
@@ -8,7 +9,11 @@ interface ProposalModalProps {
 }
 
 export const ProposalModal: React.FC<ProposalModalProps> = ({ order, onClose }) => {
-  const gigInfo = mockGigs.find(g => g.id === order.gigId);
+  const [gigInfo, setGigInfo] = useState<Gig | null>(null);
+
+  useEffect(() => {
+    getGig(order.gigId).then(setGigInfo).catch(console.error);
+  }, [order.gigId]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-obsidian/80 backdrop-blur-sm">

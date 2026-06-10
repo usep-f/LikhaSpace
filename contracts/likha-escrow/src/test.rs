@@ -40,3 +40,4 @@ fn test_initialization() {
     assert_eq!(config.client, client_addr);
     assert_eq!(client.get_status(), EscrowStatus::Unfunded);
 }
+

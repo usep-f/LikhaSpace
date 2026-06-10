@@ -10,7 +10,7 @@ export const sanitizeInput = (val: string): string => {
 // Zod Schema to validate onboarding form inputs
 export const onboardingSchema = z.object({
   role: z.enum(['artist', 'client'], {
-    errorMap: () => ({ message: 'Please select a valid role.' }),
+    error: 'Please select a valid role.',
   }),
   name: z
     .string()
