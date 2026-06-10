@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { Sparkles, PlusCircle, Check, X, Eye } from 'lucide-react';
-import { mockGigs, mockOrders, Order } from '@/lib/mockGigs';
+import { mockGigs, mockOrders, Order, Gig } from '@/lib/mockGigs';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
 import { ProposalModal } from '@/components/ProposalModal';
+import { ListingModal } from '@/components/ListingModal';
 
 // Sub-component: Stats
 const ReputationStatCard: React.FC<{ label: string; value: string; colorClass: string }> = ({ label, value, colorClass }) => (
@@ -47,6 +48,10 @@ const ListingsView: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
+  // Listing Modal State
+  const [isListingModalOpen, setIsListingModalOpen] = useState(false);
+  const [editingGig, setEditingGig] = useState<Gig | null>(null);
+
   const filteredGigs = allMyGigs.filter(gig => {
     const matchesSearch = gig.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || gig.status === statusFilter;
@@ -59,14 +64,34 @@ const ListingsView: React.FC = () => {
   const statusOptions = [
     { label: 'All Listings', value: 'all' },
     { label: 'Live (Available)', value: 'active' },
-    { label: 'Occupied (Hidden)', value: 'occupied' }
+    { label: 'Occupied (Hidden)', value: 'occupied' },
+    { label: 'Paused (Hidden)', value: 'paused' }
   ];
+
+  const handleCreateNew = () => {
+    setEditingGig(null);
+    setIsListingModalOpen(true);
+  };
+
+  const handleEdit = (gig: Gig) => {
+    setEditingGig(gig);
+    setIsListingModalOpen(true);
+  };
+
+  const handleSaveListing = (updatedGig: Partial<Gig>) => {
+    console.log('Saved listing data:', updatedGig);
+    alert('Listing saved successfully! (Mock Action)');
+    setIsListingModalOpen(false);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="font-heading font-bold text-lg text-white">My Services</h3>
-        <button className="flex items-center gap-1 px-3 py-1.5 rounded bg-hotpink text-white font-heading text-[10px] font-bold border border-hotpink/30 hover:shadow-[0_0_8px_rgba(255,0,127,0.3)] transition-all cursor-pointer">
+        <button
+          onClick={handleCreateNew}
+          className="flex items-center gap-1 px-3 py-1.5 rounded bg-hotpink text-white font-heading text-[10px] font-bold border border-hotpink/30 hover:shadow-[0_0_8px_rgba(255,0,127,0.3)] transition-all cursor-pointer"
+        >
           <PlusCircle className="w-3.5 h-3.5" />
           Create Listing
         </button>
@@ -88,16 +113,22 @@ const ListingsView: React.FC = () => {
                <div>
                  <div className="flex items-center gap-2 mb-2">
                    <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold tracking-wider ${
-                     gig.status === 'active' ? 'bg-neongreen/10 text-neongreen' : 'bg-white/10 text-white'
+                     gig.status === 'active' ? 'bg-neongreen/10 text-neongreen' :
+                     gig.status === 'paused' ? 'bg-gray-500/10 text-gray-400' : 'bg-white/10 text-white'
                    }`}>
-                     {gig.status === 'active' ? 'Live' : 'Occupied (Hidden)'}
+                     {gig.status === 'active' ? 'Live' : gig.status === 'paused' ? 'Paused' : 'Occupied (Hidden)'}
                    </span>
                  </div>
                  <p className="font-bold text-white text-sm leading-tight pr-4">{gig.title}</p>
                  <p className="text-xs text-hotpink font-bold mt-1">${gig.priceUSD} USD</p>
                </div>
                <div className="flex gap-2">
-                 <button className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0">Edit</button>
+                 <button
+                   onClick={() => handleEdit(gig)}
+                   className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                 >
+                   Edit
+                 </button>
                </div>
             </div>
           ))
@@ -113,6 +144,14 @@ const ListingsView: React.FC = () => {
         totalPages={totalPages}
         onPageChange={setCurrentPage}
       />
+
+      {isListingModalOpen && (
+        <ListingModal
+          gig={editingGig}
+          onClose={() => setIsListingModalOpen(false)}
+          onSave={handleSaveListing}
+        />
+      )}
     </div>
   );
 };

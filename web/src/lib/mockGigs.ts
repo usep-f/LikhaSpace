@@ -26,7 +26,7 @@ export interface Gig {
   priceUSD: number;
   upfrontPercentage: number;
   tags: string[];
-  status: 'active' | 'occupied'; // active = visible in marketplace, occupied = currently working on a client request
+  status: 'active' | 'occupied' | 'paused'; // active = visible, occupied = working on it, paused = hidden by user
   rating?: number; // average rating specifically for this gig
   reviewsCount?: number;
 }
@@ -167,7 +167,6 @@ export const mockGigs: Gig[] = [
     rating: 4.8,
     reviewsCount: 31
   },
-  // Add more mock gigs to test pagination (we need > 12 to see page 2)
   {
     id: 'gig-6', freelancerAddress: 'GBC2...9A4F', freelancerName: 'Sulo Audio',
     title: 'I will mix and master your indie track', category: 'music',
@@ -202,7 +201,7 @@ export const mockGigs: Gig[] = [
     id: 'gig-11', freelancerAddress: 'GDX7...R39P', freelancerName: 'Karla Garcia',
     title: 'I will design 10 social media templates in Canva', category: 'design',
     description: 'Custom, reusable social media post templates matching your brand aesthetic.',
-    priceUSD: 100, upfrontPercentage: 0, tags: ['canva', 'social media', 'templates'], status: 'active'
+    priceUSD: 100, upfrontPercentage: 0, tags: ['canva', 'social media', 'templates'], status: 'paused'
   },
   {
     id: 'gig-12', freelancerAddress: 'GCBA...L67T', freelancerName: 'Bayan Tech',
