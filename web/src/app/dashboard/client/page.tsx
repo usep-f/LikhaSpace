@@ -254,6 +254,14 @@ const ProfileSettingsView: React.FC = () => {
     name: userProfile?.name || '',
     email: userProfile?.email || '',
     phone: userProfile?.phone || '',
+    title: userProfile?.title || '',
+    bio: userProfile?.bio || '',
+    category: userProfile?.category || '',
+    careerPath: userProfile?.careerPath || '',
+    github: userProfile?.github || '',
+    linkedin: userProfile?.linkedin || '',
+    twitter: userProfile?.twitter || '',
+    portfolio: userProfile?.portfolio || '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
