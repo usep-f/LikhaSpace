@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
+import { useNotification } from '@/context/NotificationContext';
 import { Sparkles, PlusCircle, Check, X, Eye } from 'lucide-react';
 import { mockGigs, mockOrders, Order, Gig } from '@/lib/mockGigs';
 import { Pagination } from '@/components/Pagination';
@@ -42,6 +43,7 @@ const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void
 // Listings View
 const ListingsView: React.FC = () => {
   const allMyGigs = mockGigs.filter(g => g.freelancerAddress === 'GDX7...R39P');
+  const { showToast } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -80,7 +82,7 @@ const ListingsView: React.FC = () => {
 
   const handleSaveListing = (updatedGig: Partial<Gig>) => {
     console.log('Saved listing data:', updatedGig);
-    alert('Listing saved successfully! (Mock Action)');
+    showToast('Listing saved successfully! (Mock Action)', 'success');
     setIsListingModalOpen(false);
   };
 
@@ -290,6 +292,122 @@ const OrdersView: React.FC = () => {
   );
 };
 
+// History View
+const HistoryView: React.FC = () => {
+  const myCompletedOrders = mockOrders.filter(o => o.freelancerAddress === 'GDX7...R39P' && o.status === 'completed');
+
+  return (
+    <div className="space-y-6">
+      <h3 className="font-heading font-bold text-lg text-white">Transaction History</h3>
+      <div className="space-y-4">
+        {myCompletedOrders.length > 0 ? (
+          myCompletedOrders.map(order => (
+            <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col gap-4">
+               <div className="flex justify-between items-start">
+                 <div>
+                   <p className="text-xs uppercase font-bold tracking-wider text-green-400 mb-1">Completed Order</p>
+                   <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
+                   <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
+                 </div>
+                 <div className="text-right">
+                   {order.txHash && (
+                     <p className="text-[10px] text-gray-500 font-mono mt-1">Tx: {order.txHash.slice(0, 16)}...</p>
+                   )}
+                 </div>
+               </div>
+               
+               {order.review && (
+                 <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                   <div className="flex items-center gap-1 mb-1">
+                     {[...Array(5)].map((_, i) => (
+                       <Sparkles key={i} className={`w-3 h-3 ${i < order.review!.rating ? 'text-yellow-400' : 'text-gray-600'}`} />
+                     ))}
+                   </div>
+                   <p className="text-xs text-gray-300 italic">&quot;{order.review.text}&quot;</p>
+                 </div>
+               )}
+            </div>
+          ))
+        ) : (
+          <div className="py-12 text-center border border-white/5 rounded-xl glass-card">
+            <p className="text-sm text-gray-400">No completed history found.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Profile Settings View
+const ProfileSettingsView: React.FC = () => {
+  const { userProfile, registerProfile, deleteProfile } = useWallet();
+  const { showToast, showConfirm } = useNotification();
+  const [formData, setFormData] = useState({
+    name: userProfile?.name || '',
+    email: userProfile?.email || '',
+    phone: userProfile?.phone || '',
+    title: userProfile?.title || '',
+    bio: userProfile?.bio || '',
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    void registerProfile(formData);
+    showToast('Profile updated successfully!', 'success');
+  };
+
+  const handleDelete = () => {
+    showConfirm(
+      'Delete Account',
+      'Are you sure you want to completely delete your account? Your personal data will be erased, but your on-chain transactions will remain safely recorded on the Stellar network under your wallet address.',
+      async () => {
+        await deleteProfile();
+        window.location.href = '/';
+      }
+    );
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <h3 className="font-heading font-bold text-lg text-white">Profile Settings</h3>
+      <form onSubmit={handleSave} className="space-y-4 p-6 glass-card rounded-xl border border-white/5">
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
+          <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+          <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Phone</label>
+          <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Professional Title</label>
+          <input type="text" name="title" value={formData.title} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Bio</label>
+          <textarea name="bio" value={formData.bio} onChange={handleChange} rows={3} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div className="flex justify-between pt-4 mt-4 border-t border-white/5">
+          <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-500/10 text-red-400 font-bold text-sm rounded hover:bg-red-500/20 transition-colors">
+            Delete Account
+          </button>
+          <button type="submit" className="px-6 py-2 bg-hotpink text-white font-bold text-sm rounded hover:bg-pink-600 transition-colors">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 export default function ArtistDashboard() {
   const { isConnected } = useWallet();
   const [activeTab, setActiveTab] = useState('listings');
@@ -319,8 +437,8 @@ export default function ArtistDashboard() {
 
         {activeTab === 'listings' && <ListingsView />}
         {activeTab === 'orders' && <OrdersView />}
-        {activeTab === 'profile' && <p className="text-sm text-gray-400">Profile management coming soon.</p>}
-        {activeTab === 'history' && <p className="text-sm text-gray-400">Completed projects history coming soon.</p>}
+        {activeTab === 'profile' && <ProfileSettingsView />}
+        {activeTab === 'history' && <HistoryView />}
       </div>
     </div>
   );

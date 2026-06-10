@@ -1,18 +1,34 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { useNotification } from './NotificationContext';
 
 export type UserRole = 'artist' | 'client';
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  phone: string;
+  title?: string;
+  bio?: string;
+}
 
 interface WalletContextProps {
   address: string | null;
   role: UserRole | null;
+  userProfile: UserProfile | null;
+  isRegistered: boolean;
   isConnected: boolean;
   isLoading: boolean;
+  hasAttemptedLogin: boolean;
   error: string | null;
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   selectRole: (role: UserRole) => void;
+  registerProfile: (profile: UserProfile) => Promise<void>;
+  deleteProfile: () => Promise<void>;
   simulateWallet: () => void;
   clearError: () => void;
 }
@@ -26,34 +42,76 @@ const STORAGE_ROLE_KEY = 'likhaspace_user_role';
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [hasAttemptedLogin, setHasAttemptedLogin] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useNotification();
+
+  // Fetch user profile and sync sandbox rules from Firebase
+  const fetchProfileFromFirebase = useCallback(async (publicKey: string) => {
+    try {
+      const docRef = doc(db, 'users', publicKey);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // If it's a soft-deleted profile, PII fields will be empty strings
+        if (data.name) {
+          const profile: UserProfile = {
+            name: data.name || '',
+            email: data.email || '',
+            phone: data.phone || '',
+            title: data.title || '',
+            bio: data.bio || '',
+          };
+          setUserProfile(profile);
+          setIsRegistered(true);
+        } else {
+          setUserProfile(null);
+          setIsRegistered(false);
+        }
+        
+        // verificationRules from document are bypassed to use static global rules
+        if (data.role) {
+          setRole(data.role as UserRole);
+        }
+      } else {
+        setUserProfile(null);
+        setIsRegistered(false);
+      }
+    } catch (err: unknown) {
+      console.error('Error fetching profile from Firebase:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load profile data');
+    }
+  }, []);
 
   // Load persisted session
   useEffect(() => {
     const savedAddress = localStorage.getItem(STORAGE_ADDR_KEY);
     const savedRole = localStorage.getItem(STORAGE_ROLE_KEY) as UserRole | null;
     
-    // Defer state updates to avoid synchronous setState inside useEffect rule
     setTimeout(() => {
+      if (savedRole) {
+        setRole(savedRole);
+      }
       if (savedAddress) {
         setAddress(savedAddress);
         setIsConnected(true);
-        if (savedRole) {
-          setRole(savedRole);
-        }
+        void fetchProfileFromFirebase(savedAddress);
       }
       setIsLoading(false);
     }, 0);
-  }, []);
+  }, [fetchProfileFromFirebase]);
 
-  const handleWalletSuccess = (publicKey: string) => {
+  const handleWalletSuccess = useCallback((publicKey: string) => {
     setAddress(publicKey);
     setIsConnected(true);
     localStorage.setItem(STORAGE_ADDR_KEY, publicKey);
     setError(null);
-  };
+    void fetchProfileFromFirebase(publicKey);
+  }, [fetchProfileFromFirebase]);
 
   // Run a promise with a timeout limit
   const withTimeout = <T,>(promise: Promise<T>, message: string): Promise<T> => {
@@ -94,6 +152,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       );
 
       if (info && info.address) {
+        setHasAttemptedLogin(true);
         handleWalletSuccess(info.address);
       } else {
         throw new Error('No public key returned from Freighter. Is it unlocked?');
@@ -102,6 +161,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.error('Wallet connection error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect to Freighter wallet.';
       setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -111,6 +171,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const disconnectWallet = () => {
     setAddress(null);
     setRole(null);
+    setUserProfile(null);
+    setIsRegistered(false);
     setIsConnected(false);
     localStorage.removeItem(STORAGE_ADDR_KEY);
     localStorage.removeItem(STORAGE_ROLE_KEY);
@@ -122,9 +184,57 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem(STORAGE_ROLE_KEY, newRole);
   };
 
+  const registerProfile = async (profile: UserProfile) => {
+    if (!address) return;
+    setIsLoading(true);
+    try {
+      const docRef = doc(db, 'users', address);
+      await setDoc(docRef, {
+        ...profile,
+        role,
+        updatedAt: new Date().toISOString(),
+      });
+      setUserProfile(profile);
+      setIsRegistered(true);
+    } catch (err: unknown) {
+      console.error('Error registering profile:', err);
+      setError(err instanceof Error ? err.message : 'Failed to register profile in database');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteProfile = async () => {
+    if (!address) return;
+    setIsLoading(true);
+    try {
+      const docRef = doc(db, 'users', address);
+      // Hard-delete: completely remove the document to comply with Web3 / GDPR standards
+      await deleteDoc(docRef);
+      
+      setAddress(null);
+      setRole(null);
+      setUserProfile(null);
+      setIsRegistered(false);
+      setIsConnected(false);
+      localStorage.removeItem(STORAGE_ADDR_KEY);
+      localStorage.removeItem(STORAGE_ROLE_KEY);
+    } catch (err: unknown) {
+      console.error('Error soft-deleting profile:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete profile from database');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // updateVerificationRules is removed as rules are now codebase-global
+
   // Setup simulated wallet connection (for local demo/testing)
   const simulateWallet = () => {
     const mockAddress = 'GCBC...SIMULATED...DEMO...KEY';
+    setHasAttemptedLogin(true);
     handleWalletSuccess(mockAddress);
   };
 
@@ -137,12 +247,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       value={{
         address,
         role,
+        userProfile,
+        isRegistered,
         isConnected,
         isLoading,
+        hasAttemptedLogin,
         error,
         connectWallet,
         disconnectWallet,
         selectRole,
+        registerProfile,
+        deleteProfile,
         simulateWallet,
         clearError,
       }}

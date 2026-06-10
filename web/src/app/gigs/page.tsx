@@ -6,6 +6,7 @@ import { GigsFeed } from '@/components/GigsFeed';
 import { ProfileModal } from '@/components/ProfileModal';
 import { BookingModal } from '@/components/BookingModal';
 import { Gig, mockProfiles } from '@/lib/mockGigs';
+import { useNotification } from '@/context/NotificationContext';
 
 function GigsContent() {
   const searchParams = useSearchParams();
@@ -25,9 +26,11 @@ function GigsContent() {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [selectedGigToBook, setSelectedGigToBook] = useState<Gig | null>(null);
 
+  const { showToast } = useNotification();
+
   const handleBookGig = (gig: Gig, message: string) => {
     console.log(`Booking gig: ${gig.id} with message: ${message}`);
-    alert(`Booking request sent for "${gig.title}". This will trigger the Escrow initialization upon Freelancer acceptance.`);
+    showToast(`Booking request sent for "${gig.title}". This will trigger the Escrow initialization upon Freelancer acceptance.`, 'success');
     setSelectedGigToBook(null);
   };
 

@@ -59,6 +59,15 @@ export interface Order {
 
   // Chat
   chatMessages: ChatMessage[];
+
+  // On-Chain Verification
+  txHash?: string;
+
+  // Rating/Review for completed orders
+  review?: {
+    rating: number;
+    text: string;
+  };
 }
 
 export interface ChatMessage {
@@ -277,6 +286,46 @@ export const mockOrders: Order[] = [
     progressPercentage: 0,
     proposalText: 'Hi Karla, we love your glassmorphism style! We need a single landing page for our new NFT collection. It needs to have a neon green and dark purple theme. Let me know if you can fit this into your schedule!',
     changelogs: [],
+    chatMessages: []
+  },
+  {
+    id: 'order-4',
+    gigId: 'gig-1',
+    clientAddress: 'GCLIENT...999',
+    clientName: 'Sulo Games',
+    freelancerAddress: 'GDX7...R39P',
+    status: 'completed',
+    priceUSD: 800,
+    upfrontPercentage: 50,
+    progressPercentage: 100,
+    txHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    review: {
+      rating: 5,
+      text: 'Absolutely nailed the aesthetic we were looking for!'
+    },
+    changelogs: [
+      { id: 'cl7', timestamp: '2023-10-10T09:00:00Z', message: 'Project completed and files delivered.' }
+    ],
+    chatMessages: []
+  },
+  {
+    id: 'order-5',
+    gigId: 'gig-3',
+    clientAddress: 'GCLIENT...888',
+    clientName: 'Defi Protocol',
+    freelancerAddress: 'GCBA...L67T',
+    status: 'completed',
+    priceUSD: 1500,
+    upfrontPercentage: 40,
+    progressPercentage: 100,
+    txHash: 'fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9',
+    review: {
+      rating: 5,
+      text: 'Flawless contract implementation, passed audit with zero issues.'
+    },
+    changelogs: [
+      { id: 'cl8', timestamp: '2023-09-15T12:00:00Z', message: 'Smart contracts deployed on testnet and passed audit.' }
+    ],
     chatMessages: []
   }
 ];
