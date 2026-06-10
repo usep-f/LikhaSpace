@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, DocumentData } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useNotification } from './NotificationContext';
 
@@ -35,7 +35,6 @@ interface WalletContextProps {
   selectRole: (role: UserRole) => void;
   registerProfile: (profile: UserProfile) => Promise<void>;
   deleteProfile: () => Promise<void>;
-  simulateWallet: () => void;
   clearError: () => void;
 }
 
@@ -44,6 +43,20 @@ const WalletContext = createContext<WalletContextProps | undefined>(undefined);
 const TIMEOUT_MS = 5000;
 const STORAGE_ADDR_KEY = 'likhaspace_wallet_address';
 const STORAGE_ROLE_KEY = 'likhaspace_user_role';
+
+const mapFirebaseToProfile = (data: DocumentData): UserProfile => ({
+  name: data.name || '',
+  email: data.email || '',
+  phone: data.phone || '',
+  title: data.title || '',
+  bio: data.bio || '',
+  category: data.category || '',
+  careerPath: data.careerPath || '',
+  github: data.github || '',
+  linkedin: data.linkedin || '',
+  twitter: data.twitter || '',
+  portfolio: data.portfolio || '',
+});
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [address, setAddress] = useState<string | null>(null);
@@ -63,31 +76,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // If it's a soft-deleted profile, PII fields will be empty strings
         if (data.name) {
-          const profile: UserProfile = {
-            name: data.name || '',
-            email: data.email || '',
-            phone: data.phone || '',
-            title: data.title || '',
-            bio: data.bio || '',
-            category: data.category || '',
-            careerPath: data.careerPath || '',
-            github: data.github || '',
-            linkedin: data.linkedin || '',
-            twitter: data.twitter || '',
-            portfolio: data.portfolio || '',
-          };
-          setUserProfile(profile);
+          setUserProfile(mapFirebaseToProfile(data));
           setIsRegistered(true);
         } else {
           setUserProfile(null);
           setIsRegistered(false);
         }
-        
-        // verificationRules from document are bypassed to use static global rules
         if (data.role) {
-          setRole(data.role as UserRole);
+          const fetchedRole = data.role as UserRole;
+          setRole(fetchedRole);
+          localStorage.setItem(STORAGE_ROLE_KEY, fetchedRole);
         }
       } else {
         setUserProfile(null);
@@ -101,20 +100,22 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Load persisted session
   useEffect(() => {
-    const savedAddress = localStorage.getItem(STORAGE_ADDR_KEY);
-    const savedRole = localStorage.getItem(STORAGE_ROLE_KEY) as UserRole | null;
-    
-    setTimeout(() => {
+    const loadSession = async () => {
+      const savedAddress = localStorage.getItem(STORAGE_ADDR_KEY);
+      const savedRole = localStorage.getItem(STORAGE_ROLE_KEY) as UserRole | null;
+      
       if (savedRole) {
         setRole(savedRole);
       }
       if (savedAddress) {
         setAddress(savedAddress);
         setIsConnected(true);
-        void fetchProfileFromFirebase(savedAddress);
+        await fetchProfileFromFirebase(savedAddress);
       }
       setIsLoading(false);
-    }, 0);
+    };
+    
+    void loadSession();
   }, [fetchProfileFromFirebase]);
 
   const handleWalletSuccess = useCallback((publicKey: string) => {
@@ -141,28 +142,27 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
+  const fetchFreighterAddress = async () => {
+    const freighter = await import('@stellar/freighter-api');
+    const conn = await withTimeout(
+      freighter.isConnected(),
+      'Connection timed out checking for Freighter extension.'
+    );
+    if (!conn || !conn.isConnected) {
+      throw new Error('Freighter wallet extension was not detected. Please install it.');
+    }
+    return withTimeout(
+      freighter.getAddress(),
+      'Request timed out waiting for wallet response.'
+    );
+  };
+
   // Connect wallet through Freighter API
   const connectWallet = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Dynamic import of freighter api to prevent SSR crashes
-      const freighter = await import('@stellar/freighter-api');
-      
-      const connectionInfo = await withTimeout(
-        freighter.isConnected(),
-        'Connection timed out checking for Freighter extension.'
-      );
-
-      if (!connectionInfo || !connectionInfo.isConnected) {
-        throw new Error('Freighter wallet extension was not detected. Please install it or use the simulate button.');
-      }
-
-      const info = await withTimeout(
-        freighter.getAddress(),
-        'Request timed out waiting for wallet response.'
-      );
-
+      const info = await fetchFreighterAddress();
       if (info && info.address) {
         setHasAttemptedLogin(true);
         handleWalletSuccess(info.address);
@@ -190,6 +190,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.removeItem(STORAGE_ROLE_KEY);
   };
 
+  // Auto-disconnect unregistered users who refresh during onboarding
+  useEffect(() => {
+    if (!isLoading && isConnected && !isRegistered && !hasAttemptedLogin) {
+      const timer = setTimeout(() => {
+        disconnectWallet();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isConnected, isRegistered, hasAttemptedLogin]);
+
+
   // Set user role
   const selectRole = (newRole: UserRole) => {
     setRole(newRole);
@@ -201,11 +212,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsLoading(true);
     try {
       const docRef = doc(db, 'users', address);
-      await setDoc(docRef, {
+      const payload: Record<string, unknown> = {
         ...profile,
-        role,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      if (role) {
+        payload.role = role;
+      }
+      await setDoc(docRef, payload, { merge: true });
       setUserProfile(profile);
       setIsRegistered(true);
     } catch (err: unknown) {
@@ -243,13 +257,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // updateVerificationRules is removed as rules are now codebase-global
 
-  // Setup simulated wallet connection (for local demo/testing)
-  const simulateWallet = () => {
-    const mockAddress = 'GCBC...SIMULATED...DEMO...KEY';
-    setHasAttemptedLogin(true);
-    handleWalletSuccess(mockAddress);
-  };
-
   const clearError = () => {
     setError(null);
   };
@@ -270,7 +277,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         selectRole,
         registerProfile,
         deleteProfile,
-        simulateWallet,
         clearError,
       }}
     >

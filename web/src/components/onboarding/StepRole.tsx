@@ -6,11 +6,11 @@ import { UserRole } from '@/context/WalletContext';
 export const StepRole: React.FC<StepProps> = ({ formData, updateData, onNext }) => {
   const selectRole = (role: UserRole) => {
     updateData({ role });
-    onNext();
+    onNext(role);
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+    <div className="space-y-6 animate-step-pop">
       <div className="text-center mb-8">
         <h2 className="font-heading text-3xl font-bold text-white mb-2">Join LikhaSpace</h2>
         <p className="text-gray-400">Choose how you want to interact with the platform.</p>
@@ -30,7 +30,7 @@ export const StepRole: React.FC<StepProps> = ({ formData, updateData, onNext }) 
               <Palette className="w-8 h-8 text-hotpink" />
             </div>
             <div>
-              <h3 className="font-heading font-bold text-xl text-white mb-2">Creative Artist</h3>
+              <h3 className="font-heading font-bold text-xl text-white mb-2">Freelancer</h3>
               <p className="text-sm text-gray-400">
                 Showcase your skills, build on-chain reputation, and receive secure zero-fee escrow payments.
               </p>

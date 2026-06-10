@@ -8,7 +8,7 @@ export const StepSuccess: React.FC<StepProps> = ({ formData, onNext }) => {
   const isClient = role === 'client';
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in duration-500 flex flex-col items-center text-center py-8">
+    <div className="space-y-6 animate-step-pop flex flex-col items-center text-center py-8">
       <div className="relative mb-6">
         <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse"></div>
         <div className="relative bg-primary/10 p-4 rounded-full border border-primary/30">

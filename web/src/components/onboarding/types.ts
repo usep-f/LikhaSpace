@@ -23,6 +23,7 @@ export interface OnboardingFormData {
 export interface StepProps {
   formData: OnboardingFormData;
   updateData: (updates: Partial<OnboardingFormData>) => void;
-  onNext: () => void;
+  onNext: (roleOverride?: UserRole) => void;
   onBack: () => void;
+  onValidityChange?: (isValid: boolean) => void;
 }
