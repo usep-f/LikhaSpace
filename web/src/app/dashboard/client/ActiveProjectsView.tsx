@@ -85,7 +85,26 @@ export const ActiveProjectsView: React.FC = () => {
       const stroopsPerCent = await getOraclePrice();
       const totalXlmRequired = (BigInt(order.priceUSD * 100) * BigInt(stroopsPerCent)).toString();
       await fundEscrow(contractId, address, totalXlmRequired);
-      await updateOrderStatus(order.id, { status: 'escrow_funded', txHash: contractId });
+      
+      const defaultMilestones = order.milestones?.length ? order.milestones.map((m, idx) => ({
+        ...m,
+        revisionsUsed: 0,
+        state: idx === 0 ? ('active' as const) : ('locked' as const),
+      })) : [{
+        title: 'Final Deliverable',
+        payoutUSD: order.priceUSD * (1 - order.upfrontPercentage / 100),
+        maxRevisions: 2,
+        revisionsUsed: 0,
+        state: 'active' as const
+      }];
+
+      await updateOrderStatus(order.id, { 
+        status: 'escrow_funded', 
+        txHash: contractId,
+        milestones: defaultMilestones,
+        currentMilestoneIdx: 0,
+        progressPercentage: 0
+      });
       showToast('Escrow Successfully Funded!', 'success');
     } catch (e: unknown) {
       console.error(e);
@@ -99,8 +118,41 @@ export const ActiveProjectsView: React.FC = () => {
     showToast(`Approving deliverables for order ${orderId} on-chain...`, 'info');
     try {
       await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address));
-      await updateOrderStatus(orderId, { status: 'completed' });
-      showToast('Deliverable approved. Escrow funds released!', 'success');
+      
+      const milestones = order.milestones ? [...order.milestones] : [];
+      const currentIdx = order.currentMilestoneIdx || 0;
+      
+      if (milestones[currentIdx]) {
+        milestones[currentIdx].state = 'approved';
+      }
+      
+      const nextIdx = currentIdx + 1;
+      const hasNext = nextIdx < milestones.length;
+      
+      if (hasNext) {
+        milestones[nextIdx].state = 'active';
+      }
+      
+      const approvedCount = milestones.filter(m => m.state === 'approved').length;
+      const progressPercentage = Math.round((approvedCount / Math.max(milestones.length, 1)) * 100);
+      
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: hasNext 
+          ? `Approved milestone: ${milestones[currentIdx]?.title || 'Deliverable'}. Next milestone is now active.`
+          : `Approved final milestone: ${milestones[currentIdx]?.title || 'Deliverable'}. Project completed!`,
+      };
+
+      await updateOrderStatus(orderId, { 
+        status: hasNext ? 'escrow_funded' : 'completed',
+        milestones,
+        currentMilestoneIdx: nextIdx,
+        progressPercentage,
+        changelogs: [...(order.changelogs || []), newChangelog]
+      });
+      
+      showToast(hasNext ? 'Milestone approved. Funds released!' : 'Final deliverable approved. Project completed!', 'success');
       setActiveDeliverablesOrder(null);
     } catch (e: unknown) {
       console.error(e);
@@ -114,7 +166,27 @@ export const ActiveProjectsView: React.FC = () => {
     showToast(`Denying deliverables for order ${orderId} on-chain...`, 'info');
     try {
       await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address));
-      await updateOrderStatus(orderId, { status: 'escrow_funded', denialMessage: reason });
+      
+      const milestones = order.milestones ? [...order.milestones] : [];
+      const currentIdx = order.currentMilestoneIdx || 0;
+      
+      if (milestones[currentIdx]) {
+        milestones[currentIdx].state = 'active';
+        milestones[currentIdx].revisionsUsed = (milestones[currentIdx].revisionsUsed || 0) + 1;
+      }
+
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: `Denied deliverable for milestone: ${milestones[currentIdx]?.title || 'Deliverable'}. Reason: ${reason}`
+      };
+
+      await updateOrderStatus(orderId, { 
+        status: 'escrow_funded', 
+        denialMessage: reason,
+        milestones,
+        changelogs: [...(order.changelogs || []), newChangelog]
+      });
       showToast('Deliverable denied.', 'info');
       setActiveDeliverablesOrder(null);
     } catch (e: unknown) {
@@ -123,7 +195,53 @@ export const ActiveProjectsView: React.FC = () => {
     }
   };
 
+  const handlePayForRevision = async (orderId: string, reason: string) => {
+    const order = clientOrders.find(o => o.id === orderId);
+    if (!order || !order.txHash || !address) return showToast('Error: Missing data', 'error');
+    
+    showToast(`Paying for additional revision on-chain...`, 'info');
+    try {
+      const stroopsPerCent = await getOraclePrice();
+      // Assume paid revision price is 1000 ($10) as in deployment
+      const totalXlmRequired = (BigInt(1000) * BigInt(stroopsPerCent)).toString();
+      
+      const contract = await import('@/lib/contract');
+      await contract.payForRevision(order.txHash!, address, totalXlmRequired);
+      
+      showToast(`Revision paid! Authorizing deliverable denial on-chain...`, 'info');
+      await contract.denyDeliverable(order.txHash!, address);
+      
+      const milestones = order.milestones ? [...order.milestones] : [];
+      const currentIdx = order.currentMilestoneIdx || 0;
+      
+      if (milestones[currentIdx]) {
+        milestones[currentIdx].maxRevisions += 1;
+        milestones[currentIdx].revisionsUsed = (milestones[currentIdx].revisionsUsed || 0) + 1;
+        milestones[currentIdx].state = 'active';
+      }
+      
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: `Purchased additional revision & denied milestone: ${milestones[currentIdx]?.title || 'Deliverable'}. Reason: ${reason}`
+      };
+
+      await updateOrderStatus(orderId, { 
+        status: 'escrow_funded',
+        denialMessage: reason,
+        milestones,
+        changelogs: [...(order.changelogs || []), newChangelog]
+      });
+      showToast('Revision purchased and deliverable denied successfully!', 'success');
+      setActiveDeliverablesOrder(null);
+    } catch (e: unknown) {
+      console.error(e);
+      showToast(`Transaction failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    }
+  };
+
   const filteredOrders = clientOrders.filter(order => {
+    if (order.status === 'completed') return false;
     const matchesSearch =
       order.freelancerAddress.toLowerCase().includes(search.toLowerCase()) ||
       (order.gigInfo?.freelancerName.toLowerCase() || '').includes(search.toLowerCase()) ||
@@ -252,6 +370,7 @@ export const ActiveProjectsView: React.FC = () => {
           onClose={() => setActiveDeliverablesOrder(null)}
           onApprove={handleApproveDeliverables}
           onDeny={handleDenyDeliverables}
+          onPayRevision={handlePayForRevision}
         />
       )}
 

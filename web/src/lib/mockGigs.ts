@@ -19,6 +19,12 @@ export interface MilestoneConfig {
   title: string;
   payoutUSD: number;
   maxRevisions: number;
+  revisionsUsed?: number;
+  state?: 'locked' | 'active' | 'submitted' | 'approved' | 'disputed';
+  deliverablesLink?: string;
+  deliverablesStoragePath?: string;
+  deliverablesFileName?: string;
+  deliverableNotes?: string;
 }
 
 export interface Gig {
@@ -55,6 +61,7 @@ export interface Order {
   denialMessage?: string;
   proposalText?: string;
   milestones?: MilestoneConfig[];
+  currentMilestoneIdx?: number;
 
   // Deliverables
   deliverablesLink?: string;
