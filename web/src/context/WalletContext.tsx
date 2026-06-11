@@ -1,8 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc, deleteDoc, DocumentData } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { getUserProfile, registerUserProfile, deleteUserProfile } from '../lib/db';
 import { useNotification } from './NotificationContext';
 
 export type UserRole = 'artist' | 'client';
@@ -43,8 +42,23 @@ const WalletContext = createContext<WalletContextProps | undefined>(undefined);
 const TIMEOUT_MS = 5000;
 const STORAGE_ADDR_KEY = 'likhaspace_wallet_address';
 const STORAGE_ROLE_KEY = 'likhaspace_user_role';
+interface RawProfileData {
+  name?: string;
+  email?: string;
+  phone?: string;
+  title?: string;
+  bio?: string;
+  category?: string;
+  careerPath?: string;
+  github?: string;
+  linkedin?: string;
+  twitter?: string;
+  portfolio?: string;
+  role?: string;
+}
 
-const mapFirebaseToProfile = (data: DocumentData): UserProfile => ({
+const mapFirebaseToProfile = (data: RawProfileData): UserProfile => ({
+
   name: data.name || '',
   email: data.email || '',
   phone: data.phone || '',
@@ -69,13 +83,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useNotification();
 
-  // Fetch user profile and sync sandbox rules from Firebase
+  // Fetch user profile and sync sandbox rules from decentralized registry
   const fetchProfileFromFirebase = useCallback(async (publicKey: string) => {
     try {
-      const docRef = doc(db, 'users', publicKey);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
+      const data = await getUserProfile(publicKey);
+      if (data) {
         if (data.name) {
           setUserProfile(mapFirebaseToProfile(data));
           setIsRegistered(true);
@@ -93,7 +105,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsRegistered(false);
       }
     } catch (err: unknown) {
-      console.error('Error fetching profile from Firebase:', err);
+      console.error('Error fetching profile:', err);
       setError(err instanceof Error ? err.message : 'Failed to load profile data');
     }
   }, []);
@@ -211,15 +223,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!address) return;
     setIsLoading(true);
     try {
-      const docRef = doc(db, 'users', address);
-      const payload: Record<string, unknown> = {
-        ...profile,
-        updatedAt: new Date().toISOString(),
-      };
-      if (role) {
-        payload.role = role;
-      }
-      await setDoc(docRef, payload, { merge: true });
+      await registerUserProfile(address, profile, role);
       setUserProfile(profile);
       setIsRegistered(true);
     } catch (err: unknown) {
@@ -235,9 +239,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!address) return;
     setIsLoading(true);
     try {
-      const docRef = doc(db, 'users', address);
-      // Hard-delete: completely remove the document to comply with Web3 / GDPR standards
-      await deleteDoc(docRef);
+      await deleteUserProfile(address);
       
       setAddress(null);
       setRole(null);
@@ -247,7 +249,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       localStorage.removeItem(STORAGE_ADDR_KEY);
       localStorage.removeItem(STORAGE_ROLE_KEY);
     } catch (err: unknown) {
-      console.error('Error soft-deleting profile:', err);
+      console.error('Error deleting profile:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete profile from database');
       throw err;
     } finally {
