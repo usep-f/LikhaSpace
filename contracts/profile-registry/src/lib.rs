@@ -1,5 +1,7 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec, Map};
+
+const USERS_KEY: Symbol = Symbol::short("users");
 
 #[contract]
 pub struct ProfileRegistry;
@@ -12,6 +14,13 @@ impl ProfileRegistry {
         // Extend persistent storage TTL (1 day threshold, extend to ~30 days)
         env.storage().persistent().extend_ttl(&user, 17280, 518400);
 
+        let mut users: Vec<Address> = env.storage().instance().get(&USERS_KEY).unwrap_or(Vec::new(&env));
+        if !users.contains(&user) {
+            users.push_back(user.clone());
+            env.storage().instance().set(&USERS_KEY, &users);
+        }
+        env.storage().instance().extend_ttl(17280, 518400);
+
         // Emit event for discovery
         env.events().publish(
             (Symbol::new(&env, "profile_set"), user.clone()),
@@ -19,9 +28,19 @@ impl ProfileRegistry {
         );
     }
 
-
     pub fn get_profile(env: Env, user: Address) -> Option<String> {
         env.storage().persistent().get(&user)
+    }
+
+    pub fn get_all_profiles(env: Env) -> Map<Address, String> {
+        let mut map = Map::new(&env);
+        let users: Vec<Address> = env.storage().instance().get(&USERS_KEY).unwrap_or(Vec::new(&env));
+        for user in users.iter() {
+            if let Some(cid) = env.storage().persistent().get::<Address, String>(&user) {
+                map.set(user, cid);
+            }
+        }
+        map
     }
 }
 
@@ -44,5 +63,8 @@ mod test {
 
         let fetched_cid = client.get_profile(&user).unwrap();
         assert_eq!(fetched_cid, ipfs_cid);
+        
+        let all = client.get_all_profiles();
+        assert_eq!(all.get(user).unwrap(), ipfs_cid);
     }
 }

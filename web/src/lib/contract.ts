@@ -98,41 +98,57 @@ export async function setProfileCID(userAddress: string, ipfsCid: string) {
 export async function getContractEvents(contractId: string, topics?: string[][]) {
   try {
     const latest = await server.getLatestLedger();
-    const startLedger = Math.max(1, latest.sequence - 50000);
+    const ranges = [50000, 10000, 2000, 500, 50];
     const filters = [{
       type: 'contract' as const,
       contractIds: [contractId],
       ...(topics ? { topics } : {})
     }];
-    const response = await server.getEvents({
-      startLedger,
-      filters,
-      limit: 100
-    });
-    return response.events || [];
+    for (const range of ranges) {
+      try {
+        const startLedger = Math.max(1, latest.sequence - range);
+        const response = await server.getEvents({ startLedger, filters, limit: 100 });
+        return response.events || [];
+      } catch (err) {
+        const rawMsg = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : err;
+        const msg = String(rawMsg).toLowerCase();
+        if (msg.includes('start') || msg.includes('ledger') || msg.includes('before') || msg.includes('oldest') || msg.includes('range')) {
+          continue; // Try smaller range
+        }
+        throw err;
+      }
+    }
   } catch (e) {
     console.error('getContractEvents failed:', e);
-    return [];
   }
+  return [];
 }
 
 export async function getRegisteredProfiles(): Promise<Map<string, string>> {
-  const events = await getContractEvents(PROFILE_REGISTRY_ID);
   const profilesMap = new Map<string, string>();
-  for (const ev of events) {
-    try {
-      const topic = ev.topic;
-      if (topic && topic.length >= 2) {
-        const eventName = topic[0].sym().toString();
-        if (eventName === 'profile_set') {
-          const userAddr = Address.fromScVal(topic[1]).toString();
-          const ipfsCid = ev.value.str().toString();
-          profilesMap.set(userAddr, ipfsCid);
+  try {
+    const dummyAccount = 'GAFBCLO24QMPVXFZJHVLRG6CKAGBJEMCW57UG45SS7PQ2LGMZTGY7DGX';
+    const account = await server.getAccount(dummyAccount);
+    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
+      .addOperation(new Contract(PROFILE_REGISTRY_ID).call('get_all_profiles'))
+      .setTimeout(30)
+      .build();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationSuccess(sim) && sim.result && sim.result.retval) {
+      const retval = sim.result.retval;
+      if (retval.switch() === xdr.ScValType.scvMap()) {
+        const mapEntries = retval.map();
+        if (mapEntries) {
+          for (const entry of mapEntries) {
+            const userAddr = Address.fromScVal(entry.key()).toString();
+            const ipfsCid = entry.val().str().toString();
+            profilesMap.set(userAddr, ipfsCid);
+          }
         }
       }
-    } catch (e) {
-      console.warn('Failed to parse event:', e);
     }
+  } catch (e) {
+    console.error('Failed to get registered profiles:', e);
   }
   return profilesMap;
 }
