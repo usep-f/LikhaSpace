@@ -3,14 +3,16 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
-import { Sparkles, PlusCircle, Check, X, Eye } from 'lucide-react';
+import { Sparkles, PlusCircle, Check, X, Eye, MessageSquare, Activity, UploadCloud } from 'lucide-react';
 import { Order, Gig, FreelancerProfile } from '@/lib/mockGigs';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
 import { subscribeToFreelancerOrders, updateOrderStatus, createGig, getFreelancerGigs, getUserProfile, getFreelancerOrders } from '@/lib/db';
-import { submitDeliverable } from '@/lib/contract';
 import { ProposalModal } from '@/components/ProposalModal';
 import { ListingModal } from '@/components/ListingModal';
+import { ChatModal } from '@/components/ChatModal';
+import { StatusModal } from '@/components/StatusModal';
+import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 
 // Sub-component: Stats
 const ReputationStatCard: React.FC<{ label: string; value: string; colorClass: string }> = ({ label, value, colorClass }) => (
@@ -228,8 +230,12 @@ const OrdersView: React.FC = () => {
 
   // Modal State
   const [activeProposalOrder, setActiveProposalOrder] = useState<Order | null>(null);
+  const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
+  const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
+  const [activeSubmitOrder, setActiveSubmitOrder] = useState<Order | null>(null);
 
   const filteredOrders = myOrders.filter(order => {
+    if (order.status === 'completed') return false;
     const matchesSearch = order.clientName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -243,20 +249,6 @@ const OrdersView: React.FC = () => {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast(`Error accepting booking: ${msg}`, 'error');
-    }
-  };
-
-  const handleSubmitDeliverable = async (order: Order) => {
-    if (!order.txHash || !address) return showToast('Error: Missing contract data or wallet address', 'error');
-    showToast('Submitting deliverables on-chain...', 'info');
-    try {
-      await submitDeliverable(order.txHash, address);
-      await updateOrderStatus(order.id, { status: 'delivered' });
-      showToast('Deliverables successfully submitted to the escrow contract!', 'success');
-    } catch (e: unknown) {
-      console.error(e);
-      const msg = e instanceof Error ? e.message : String(e);
-      showToast(`Submission failed: ${msg}`, 'error');
     }
   };
 
@@ -346,14 +338,23 @@ const OrdersView: React.FC = () => {
                    <div className="flex gap-2">
                      {order.status === 'escrow_funded' && (
                        <button
-                         onClick={() => handleSubmitDeliverable(order)}
-                         className="px-4 py-2 rounded bg-neoncyan border border-neoncyan/30 text-obsidian font-heading font-bold text-xs uppercase hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)]"
+                         onClick={() => setActiveSubmitOrder(order)}
+                         className="px-4 py-2 rounded bg-neoncyan border border-neoncyan/30 text-obsidian font-heading font-bold text-xs uppercase hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)] flex items-center gap-1"
                        >
-                         Submit Deliverable
+                         <UploadCloud className="w-4 h-4" /> Submit Deliverables
                        </button>
                      )}
-                     <button className="px-4 py-2 rounded bg-white/5 border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors cursor-pointer">
-                       Open Workspace
+                     <button
+                       onClick={() => setActiveChatOrder(order)}
+                       className="px-4 py-2 rounded bg-[#141026] border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/5 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                     >
+                       <MessageSquare className="w-4 h-4" /> Message
+                     </button>
+                     <button
+                       onClick={() => setActiveStatusOrder(order)}
+                       className="px-4 py-2 rounded bg-white text-black font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                     >
+                       <Activity className="w-4 h-4" /> View Status
                      </button>
                    </div>
                  )}
@@ -377,6 +378,32 @@ const OrdersView: React.FC = () => {
         <ProposalModal
           order={activeProposalOrder}
           onClose={() => setActiveProposalOrder(null)}
+        />
+      )}
+
+      {activeChatOrder && (
+        <ChatModal
+          order={activeChatOrder}
+          currentAddress={address!}
+          onClose={() => setActiveChatOrder(null)}
+        />
+      )}
+
+      {activeStatusOrder && (
+        <StatusModal
+          order={activeStatusOrder}
+          onClose={() => setActiveStatusOrder(null)}
+        />
+      )}
+
+      {activeSubmitOrder && (
+        <SubmitDeliverableModal
+          order={activeSubmitOrder}
+          onClose={() => setActiveSubmitOrder(null)}
+          onSuccess={() => {
+            setActiveSubmitOrder(null);
+            showToast('Deliverables successfully submitted for review!', 'success');
+          }}
         />
       )}
     </div>
