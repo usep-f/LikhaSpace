@@ -258,7 +258,7 @@ const OrdersView: React.FC = () => {
   const [activeDisputeOrder, setActiveDisputeOrder] = useState<Order | null>(null);
 
   const filteredOrders = myOrders.filter(order => {
-    if (order.status === 'completed' || order.status === 'denied') return false;
+    if (order.status === 'completed' || order.status === 'denied' || order.status === 'settled_dispute') return false;
     const matchesSearch = order.clientName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || 
       (statusFilter === 'disputed' && (order.status === 'disputed' || order.status === 'mediation')) || 

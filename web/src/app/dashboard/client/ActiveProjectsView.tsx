@@ -379,7 +379,7 @@ export const ActiveProjectsView: React.FC = () => {
   };
 
   const filteredOrders = clientOrders.filter(order => {
-    if (order.status === 'completed' || order.status === 'denied') return false;
+    if (order.status === 'completed' || order.status === 'denied' || order.status === 'settled_dispute') return false;
     const matchesSearch =
       order.freelancerAddress.toLowerCase().includes(search.toLowerCase()) ||
       (order.gigInfo?.freelancerName.toLowerCase() || '').includes(search.toLowerCase()) ||
