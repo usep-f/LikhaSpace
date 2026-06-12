@@ -76,6 +76,7 @@ export interface Order {
 
   // On-Chain Verification
   txHash?: string;
+  upfrontReleased?: boolean;
 
   // Rating/Review for completed orders
   review?: {

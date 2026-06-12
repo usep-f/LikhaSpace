@@ -13,6 +13,7 @@ import { ListingModal } from '@/components/ListingModal';
 import { ChatModal } from '@/components/ChatModal';
 import { StatusModal } from '@/components/StatusModal';
 import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
+import { refundRemaining, cancelUnfunded } from '@/lib/contract';
 
 function getStatusBadge(order: Order) {
   if (order.status === 'pending_acceptance') return { text: 'Pending Acceptance', classes: 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' };
@@ -235,7 +236,7 @@ const OrdersView: React.FC = () => {
     });
     return () => unsubscribe();
   }, [address]);
-  const { showToast, showLoading, hideLoading } = useNotification();
+  const { showToast, showConfirm, showLoading, hideLoading } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -253,7 +254,7 @@ const OrdersView: React.FC = () => {
   const [activeSubmitOrder, setActiveSubmitOrder] = useState<Order | null>(null);
 
   const filteredOrders = myOrders.filter(order => {
-    if (order.status === 'completed') return false;
+    if (order.status === 'completed' || order.status === 'denied') return false;
     const matchesSearch = order.clientName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -270,6 +271,72 @@ const OrdersView: React.FC = () => {
     } finally {
       hideLoading();
     }
+  };
+
+  const handleCancelUnfunded = async (order: Order) => {
+    showConfirm(
+      'Cancel Booking Request',
+      'Are you sure you want to cancel this booking request before it is funded?',
+      async () => {
+        if (!address) return showToast('Wallet not connected', 'error');
+        try {
+          showLoading('Canceling booking request on-chain...');
+          if (order.txHash) {
+            await cancelUnfunded(order.txHash, address);
+          }
+
+          const newChangelog = {
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            message: 'Booking request cancelled by freelancer before funding.',
+          };
+
+          await updateOrderStatus(order.id, {
+            status: 'denied',
+            changelogs: [...(order.changelogs || []), newChangelog]
+          });
+
+          showToast('Booking request cancelled successfully!', 'success');
+        } catch (e: unknown) {
+          console.error(e);
+          showToast(`Cancellation failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+        } finally {
+          hideLoading();
+        }
+      }
+    );
+  };
+
+  const handleCancelFunded = async (order: Order) => {
+    showConfirm(
+      'Cancel Project & Refund Client',
+      'Are you sure you want to cancel this project and refund all remaining locked funds to the client? Any completed milestone payouts already in your wallet will be kept, but you will forfeit the active milestone and future milestones.',
+      async () => {
+        if (!address || !order.txHash) return showToast('Missing contract or wallet data', 'error');
+        try {
+          showLoading('Canceling project and refunding client on-chain...');
+          await refundRemaining(order.txHash, address);
+
+          const newChangelog = {
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            message: 'Project cancelled by freelancer. All remaining locked funds refunded to client.',
+          };
+
+          await updateOrderStatus(order.id, {
+            status: 'denied',
+            changelogs: [...(order.changelogs || []), newChangelog]
+          });
+
+          showToast('Project cancelled and client refunded successfully!', 'success');
+        } catch (e: unknown) {
+          console.error(e);
+          showToast(`Refund failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+        } finally {
+          hideLoading();
+        }
+      }
+    );
   };
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -359,31 +426,49 @@ const OrdersView: React.FC = () => {
                      </div>
                    )
                  ) : (
-                   <div className="flex gap-2">
-                     {order.status === 'escrow_funded' && (
-                       <button
-                         title="Submit Deliverables"
-                         onClick={() => setActiveSubmitOrder(order)}
-                         className="p-2.5 rounded bg-neoncyan border border-neoncyan/30 text-obsidian hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)]"
-                       >
-                         <UploadCloud className="w-5 h-5" />
-                       </button>
-                     )}
-                     <button
-                       title="Message"
-                       onClick={() => setActiveChatOrder(order)}
-                       className="p-2.5 rounded bg-[#141026] border border-white/10 text-white hover:bg-white/5 transition-colors cursor-pointer"
-                     >
-                       <MessageSquare className="w-5 h-5" />
-                     </button>
-                     <button
-                       title="View Status"
-                       onClick={() => setActiveStatusOrder(order)}
-                       className="p-2.5 rounded bg-white text-black hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
-                     >
-                       <Activity className="w-5 h-5" />
-                     </button>
-                   </div>
+                    <div className="flex gap-2 flex-wrap justify-end">
+                      {order.status === 'awaiting_funding' && (
+                        <button
+                          title="Cancel Request"
+                          onClick={() => handleCancelUnfunded(order)}
+                          className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
+                      {order.status === 'escrow_funded' && (
+                        <>
+                          <button
+                            title="Submit Deliverables"
+                            onClick={() => setActiveSubmitOrder(order)}
+                            className="p-2.5 rounded bg-neoncyan border border-neoncyan/30 text-obsidian hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)]"
+                          >
+                            <UploadCloud className="w-5 h-5" />
+                          </button>
+                          <button
+                            title="Cancel Project (Refund)"
+                            onClick={() => handleCancelFunded(order)}
+                            className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        title="Message"
+                        onClick={() => setActiveChatOrder(order)}
+                        className="p-2.5 rounded bg-[#141026] border border-white/10 text-white hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <MessageSquare className="w-5 h-5" />
+                      </button>
+                      <button
+                        title="View Status"
+                        onClick={() => setActiveStatusOrder(order)}
+                        className="p-2.5 rounded bg-white text-black hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
+                      >
+                        <Activity className="w-5 h-5" />
+                      </button>
+                    </div>
                  )}
                </div>
             </div>
@@ -446,7 +531,7 @@ const HistoryView: React.FC = () => {
     if (!address) return;
     getFreelancerOrders(address)
       .then(orders => {
-        setCompletedOrders(orders.filter(o => o.status === 'completed'));
+        setCompletedOrders(orders.filter(o => o.status === 'completed' || o.status === 'denied'));
       })
       .catch(console.error);
   }, [address]);
@@ -460,7 +545,11 @@ const HistoryView: React.FC = () => {
             <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col gap-4">
                <div className="flex justify-between items-start">
                  <div>
-                   <p className="text-xs uppercase font-bold tracking-wider text-green-400 mb-1">Completed Order</p>
+                   <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${
+                     order.status === 'completed' ? 'text-green-400' : 'text-red-400'
+                   }`}>
+                     {order.status === 'completed' ? 'Completed Order' : 'Cancelled Order'}
+                   </p>
                    <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
                    <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
                  </div>
@@ -537,7 +626,7 @@ const ProfileSettingsView: React.FC = () => {
           showLoading('Deleting account...');
           await deleteProfile();
           window.location.href = '/';
-        } catch (e) {
+        } catch {
           hideLoading();
         }
       }

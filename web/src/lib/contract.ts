@@ -261,3 +261,60 @@ export async function refundRemaining(contractId: string, freelancerAddress: str
 
   return submitTransaction(txBuilder);
 }
+
+export async function cancelUnfunded(contractId: string, callerAddress: string) {
+  const account = await server.getAccount(callerAddress);
+  const contract = new Contract(contractId);
+  
+  const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(contract.call('cancel_unfunded', new Address(callerAddress).toScVal()));
+
+  return submitTransaction(txBuilder);
+}
+
+export async function clientCancelWithKillFee(contractId: string, clientAddress: string) {
+  const account = await server.getAccount(clientAddress);
+  const contract = new Contract(contractId);
+  
+  const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(contract.call('client_cancel_with_kill_fee', new Address(clientAddress).toScVal()));
+
+  return submitTransaction(txBuilder);
+}
+
+export async function claimRefundTimeout(contractId: string, clientAddress: string) {
+  const account = await server.getAccount(clientAddress);
+  const contract = new Contract(contractId);
+  
+  const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(contract.call('claim_refund_timeout', new Address(clientAddress).toScVal()));
+
+  return submitTransaction(txBuilder);
+}
+
+export async function releaseUpfront(contractId: string, clientAddress: string) {
+  const account = await server.getAccount(clientAddress);
+  const contract = new Contract(contractId);
+  
+  const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(contract.call('release_upfront', new Address(clientAddress).toScVal()));
+
+  return submitTransaction(txBuilder);
+}
+
+export async function isUpfrontReleased(contractId: string, clientAddress: string): Promise<boolean> {
+  try {
+    const account = await server.getAccount(clientAddress);
+    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
+      .addOperation(new Contract(contractId).call('is_upfront_released'))
+      .setTimeout(30).build();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationSuccess(sim) && sim.result) {
+      const val = sim.result.retval;
+      return val.switch() === xdr.ScValType.scvBool() && val.b();
+    }
+  } catch (e) {
+    console.error('Failed to query isUpfrontReleased:', e);
+  }
+  return false;
+}
