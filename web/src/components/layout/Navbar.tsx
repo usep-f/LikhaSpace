@@ -30,11 +30,10 @@ const TestnetBadge: React.FC = () => (
 // Sub-component: Wallet Connect Button
 interface WalletButtonProps {
   onConnect: () => void;
-  onSimulate: () => void;
   isLoading: boolean;
 }
 
-const ConnectButtons: React.FC<WalletButtonProps> = ({ onConnect, onSimulate, isLoading }) => (
+const ConnectButtons: React.FC<WalletButtonProps> = ({ onConnect, isLoading }) => (
   <div className="flex items-center space-x-2">
     <button
       onClick={onConnect}
@@ -44,30 +43,26 @@ const ConnectButtons: React.FC<WalletButtonProps> = ({ onConnect, onSimulate, is
       <Wallet className="w-3.5 h-3.5" />
       <span>{isLoading ? 'Connecting...' : 'Freighter'}</span>
     </button>
-    <button
-      onClick={onSimulate}
-      className="flex items-center space-x-1.5 bg-violet-dark hover:bg-violet-dark/90 text-neoncyan hover:text-white border border-neoncyan/30 hover:border-neoncyan/80 px-2.5 py-1.5 rounded-lg font-heading text-[10px] font-semibold cursor-pointer transition-all duration-200"
-    >
-      <span>Demo Sign In</span>
-    </button>
   </div>
 );
 
 // Sub-component: Connected User Profile Box
 interface ProfileBoxProps {
   address: string;
+  name?: string;
   role: string | null;
   onDisconnect: () => void;
 }
 
-const ProfileBox: React.FC<ProfileBoxProps> = ({ address, role, onDisconnect }) => {
+const ProfileBox: React.FC<ProfileBoxProps> = ({ address, name, role, onDisconnect }) => {
   const shortAddress = `${address.slice(0, 4)}...${address.slice(-4)}`;
+  const displayName = name || shortAddress;
   return (
     <div className="flex items-center space-x-3 bg-violet-dark/50 border border-white/10 px-2.5 py-1 rounded-lg">
       <div className="text-right">
-        <p className="text-xs font-bold text-gray-300 font-heading leading-tight">{shortAddress}</p>
+        <p className="text-xs font-bold text-gray-300 font-heading leading-tight">{displayName}</p>
         <p className="text-[9px] text-neoncyan uppercase font-bold tracking-wider leading-none">
-          {role || 'Select Role'}
+          {role === 'artist' ? 'Freelancer' : (role || 'Select Role')}
         </p>
       </div>
       <button
@@ -82,7 +77,7 @@ const ProfileBox: React.FC<ProfileBoxProps> = ({ address, role, onDisconnect }) 
 };
 
 export const Navbar: React.FC = () => {
-  const { address, role, isConnected, isLoading, connectWallet, disconnectWallet, simulateWallet } = useWallet();
+  const { address, role, isConnected, isLoading, connectWallet, disconnectWallet, userProfile } = useWallet();
 
   const dashboardUrl = role === 'artist' 
     ? '/dashboard/artist' 
@@ -119,15 +114,15 @@ export const Navbar: React.FC = () => {
               <span className="text-[9px] text-gray-500">Dev Sandbox:</span>
               <Link href="/dashboard/client" className="hover:text-neoncyan transition-colors">Client</Link>
               <span>•</span>
-              <Link href="/dashboard/artist" className="hover:text-hotpink transition-colors">Artist</Link>
+              <Link href="/dashboard/artist" className="hover:text-hotpink transition-colors">Freelancer</Link>
               <span>•</span>
               <Link href="/dashboard/mediator" className="hover:text-neongreen transition-colors">Mediator</Link>
             </div>
 
             {isConnected && address ? (
-              <ProfileBox address={address} role={role} onDisconnect={disconnectWallet} />
+              <ProfileBox address={address} name={userProfile?.name} role={role} onDisconnect={disconnectWallet} />
             ) : (
-              <ConnectButtons onConnect={connectWallet} onSimulate={simulateWallet} isLoading={isLoading} />
+              <ConnectButtons onConnect={connectWallet} isLoading={isLoading} />
             )}
           </div>
         </div>

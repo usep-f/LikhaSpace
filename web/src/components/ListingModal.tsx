@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Gig } from '@/lib/mockGigs';
-import { X, Save, AlertTriangle } from 'lucide-react';
+import { Gig, MilestoneConfig } from '@/lib/mockGigs';
+import { X, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 
 interface ListingModalProps {
   gig?: Gig | null; // Pass gig to edit, or null to create new
@@ -20,8 +20,14 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
     priceUSD: gig?.priceUSD || 100,
     upfrontPercentage: gig?.upfrontPercentage || 20,
     tags: gig?.tags?.join(', ') || '',
-    status: gig?.status || 'active' as Gig['status']
+    status: gig?.status || 'active' as Gig['status'],
+    milestones: gig?.milestones || [] as MilestoneConfig[]
   });
+
+  const upfrontAmount = formData.priceUSD * (formData.upfrontPercentage / 100);
+  const milestoneTotal = formData.milestones.reduce((acc, m) => acc + m.payoutUSD, 0);
+  const totalAllocated = upfrontAmount + milestoneTotal;
+  const isMilestonesValid = formData.milestones.length === 0 || Math.abs(totalAllocated - formData.priceUSD) < 0.01;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,6 +156,103 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
                 </span>
               </div>
             </div>
+
+            <div className="space-y-1 md:col-span-2 border-t border-white/5 pt-5 mt-2">
+              <label className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center justify-between">
+                <span>Milestone Payment Schedule (Optional)</span>
+                {isOccupied && <span className="text-yellow-500">Locked</span>}
+              </label>
+              <p className="text-xs text-gray-400 mb-3">
+                If left empty, the remaining balance will automatically become a single final milestone.
+              </p>
+              
+              <div className="space-y-3">
+                {formData.milestones.map((milestone, idx) => (
+                  <div key={idx} className="flex flex-col md:flex-row gap-3 items-start bg-white/5 p-4 rounded-lg border border-white/10">
+                    <div className="flex-1 space-y-1 w-full">
+                      <label className="text-[10px] uppercase text-gray-400">Milestone Title</label>
+                      <input 
+                        type="text"
+                        value={milestone.title}
+                        onChange={(e) => {
+                          const newM = [...formData.milestones];
+                          newM[idx].title = e.target.value;
+                          setFormData({...formData, milestones: newM});
+                        }}
+                        disabled={isOccupied}
+                        required
+                        className={`w-full p-2 text-sm rounded transition-colors ${isOccupied ? 'bg-white/5 border border-white/5 text-gray-400 cursor-not-allowed' : 'bg-obsidian border border-white/10 text-white focus:outline-none focus:border-neoncyan'}`}
+                      />
+                    </div>
+                    <div className="w-full md:w-32 space-y-1">
+                      <label className="text-[10px] uppercase text-gray-400">Payout ($)</label>
+                      <input 
+                        type="number"
+                        value={milestone.payoutUSD || ''}
+                        onChange={(e) => {
+                          const newM = [...formData.milestones];
+                          newM[idx].payoutUSD = Number(e.target.value);
+                          setFormData({...formData, milestones: newM});
+                        }}
+                        disabled={isOccupied}
+                        required
+                        min="1"
+                        className={`w-full p-2 text-sm rounded transition-colors ${isOccupied ? 'bg-white/5 border border-white/5 text-gray-400 cursor-not-allowed' : 'bg-obsidian border border-white/10 text-white focus:outline-none focus:border-neoncyan'}`}
+                      />
+                    </div>
+                    <div className="w-full md:w-24 space-y-1">
+                      <label className="text-[10px] uppercase text-gray-400">Revisions</label>
+                      <input 
+                        type="number"
+                        value={milestone.maxRevisions || ''}
+                        onChange={(e) => {
+                          const newM = [...formData.milestones];
+                          newM[idx].maxRevisions = Number(e.target.value);
+                          setFormData({...formData, milestones: newM});
+                        }}
+                        disabled={isOccupied}
+                        required
+                        min="0"
+                        className={`w-full p-2 text-sm rounded transition-colors ${isOccupied ? 'bg-white/5 border border-white/5 text-gray-400 cursor-not-allowed' : 'bg-obsidian border border-white/10 text-white focus:outline-none focus:border-neoncyan'}`}
+                      />
+                    </div>
+                    {!isOccupied && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          const newM = [...formData.milestones];
+                          newM.splice(idx, 1);
+                          setFormData({...formData, milestones: newM});
+                        }}
+                        className="mt-6 p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              {!isOccupied && (
+                <button
+                  type="button"
+                  onClick={() => setFormData({
+                    ...formData, 
+                    milestones: [...formData.milestones, { title: '', payoutUSD: 0, maxRevisions: 0 }]
+                  })}
+                  className="mt-3 flex items-center gap-2 text-xs font-bold text-neoncyan hover:text-white transition-colors py-2 px-3 bg-neoncyan/10 hover:bg-neoncyan/20 rounded-lg cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Add Milestone
+                </button>
+              )}
+
+              {formData.milestones.length > 0 && (
+                <div className={`mt-4 p-3 rounded-lg border text-sm font-bold flex items-center justify-between ${isMilestonesValid ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                  <span>Upfront: ${upfrontAmount.toFixed(2)} + Milestones: ${milestoneTotal.toFixed(2)}</span>
+                  <span>Sum: ${totalAllocated.toFixed(2)} / ${formData.priceUSD.toFixed(2)} {isMilestonesValid ? '(Correct!)' : '(Mismatch)'}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {isEditing && !isOccupied && (
@@ -188,7 +291,12 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 rounded-lg bg-neoncyan text-obsidian font-heading font-bold text-xs uppercase tracking-wider hover:shadow-[0_0_15px_rgba(0,255,255,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={!isMilestonesValid}
+              className={`flex-1 py-3 rounded-lg font-heading font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                isMilestonesValid 
+                  ? 'bg-neoncyan text-obsidian hover:shadow-[0_0_15px_rgba(0,255,255,0.4)] cursor-pointer' 
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              }`}
             >
               <Save className="w-4 h-4" />
               {isEditing ? 'Save Changes' : 'Create Listing'}
