@@ -20,8 +20,8 @@ export const ActiveDisputesView: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = subscribeToMediatorOrders(async (fetchedOrders) => {
-      // Filter only disputed
-      const disputedOrders = fetchedOrders.filter(o => o.status === 'disputed');
+      // Filter only mediation
+      const disputedOrders = fetchedOrders.filter(o => o.status === 'mediation');
       
       const enriched = await Promise.all(
         disputedOrders.map(async (o) => {

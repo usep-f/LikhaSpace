@@ -55,7 +55,7 @@ export interface Order {
   clientAddress: string;
   clientName: string;
   freelancerAddress: string;
-  status: 'pending_acceptance' | 'denied' | 'awaiting_funding' | 'escrow_funded' | 'delivered' | 'completed' | 'disputed' | 'settled_dispute';
+  status: 'pending_acceptance' | 'denied' | 'awaiting_funding' | 'escrow_funded' | 'delivered' | 'completed' | 'disputed' | 'settled_dispute' | 'mediation';
   priceUSD: number;
   upfrontPercentage: number;
   denialMessage?: string;
