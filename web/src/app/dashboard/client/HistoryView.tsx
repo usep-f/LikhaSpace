@@ -15,7 +15,7 @@ export const HistoryView: React.FC = () => {
     if (!address) return;
     getClientOrders(address)
       .then(async (orders) => {
-        const completed = orders.filter(o => o.status === 'completed' || o.status === 'denied');
+        const completed = orders.filter(o => o.status === 'completed' || o.status === 'denied' || o.status === 'settled_dispute');
         const enriched = await Promise.all(
           completed.map(async (o) => {
             const gigInfo = await getGig(o.gigId);
@@ -49,9 +49,11 @@ export const HistoryView: React.FC = () => {
                <div className="flex justify-between items-start">
                  <div>
                      <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${
-                       order.status === 'completed' ? 'text-neongreen' : 'text-red-400'
+                       order.status === 'completed' ? 'text-neongreen' : 
+                       order.status === 'settled_dispute' ? 'text-yellow-500' : 'text-red-400'
                      }`}>
-                       {order.status === 'completed' ? 'Completed Order' : 'Cancelled Order'}
+                       {order.status === 'completed' ? 'Completed Order' : 
+                        order.status === 'settled_dispute' ? 'Settled Dispute' : 'Cancelled Order'}
                      </p>
                     <p className="text-sm font-bold text-white flex items-center gap-1">
                       Freelancer: {order.gigInfo?.freelancerName || order.freelancerAddress}

@@ -2,7 +2,7 @@
 
 use super::*;
 use soroban_sdk::{
-    testutils::Address as _, token, Address, Env,
+    testutils::{Address as _, Ledger as _}, token, Address, Env,
 };
 
 #[contract]
@@ -247,5 +247,166 @@ fn test_release_upfront_and_cancel() {
     assert_eq!(client.get_status(), EscrowStatus::Cancelled);
     assert_eq!(token_client.balance(&freelancer), 5_000_000_000i128); // Freelancer keeps upfront
     assert_eq!(token_client.balance(&client_addr), 35_000_000_000i128); // Client gets back remaining 2,500 XLM
+    assert_eq!(client.get_locked_balance(), 0i128);
+}
+
+#[test]
+fn test_p2p_dispute_proposal_and_accept() {
+    let env = Env::default();
+    let (freelancer, client_addr, token, oracle, mediator, client) = setup_test_env(&env);
+    
+    let milestones = soroban_sdk::vec![&env, Milestone {
+        payout_amount_usd: 10000,
+        max_revisions: 2,
+        revisions_used: 0,
+        state: MilestoneState::Locked,
+    }];
+
+    client.initialize(
+        &freelancer,
+        &client_addr,
+        &token,
+        &oracle,
+        &mediator,
+        &5000,
+        &1000,
+        &milestones,
+        &1209600,
+        &2592000,
+    );
+
+    let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
+    env.mock_all_auths();
+    stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
+    client.fund(&client_addr, &30_000_000_000i128);
+
+    // Request mediation (file dispute)
+    client.request_mediation(&client_addr);
+    assert_eq!(client.get_status(), EscrowStatus::Disputed);
+
+    // Propose split (60% to freelancer, 40% to client)
+    // Locked balance is 15,000_000_000 stroops (1,500 XLM)
+    let f_payout = 9_000_000_000i128;
+    let c_refund = 6_000_000_000i128;
+    client.propose_dispute_split(&client_addr, &f_payout, &c_refund);
+
+    // Verify stored proposal
+    let opt_proposal = client.get_dispute_proposal();
+    assert!(opt_proposal.is_some());
+    let proposal = opt_proposal.unwrap();
+    assert_eq!(proposal.proposer, client_addr);
+    assert_eq!(proposal.freelancer_payout, f_payout);
+    assert_eq!(proposal.client_refund, c_refund);
+
+    // Freelancer accepts proposal
+    client.accept_dispute_split(&freelancer);
+
+    // Verify final status and balances
+    assert_eq!(client.get_status(), EscrowStatus::Cancelled);
+    let token_client = token::Client::new(&env, &token);
+    assert_eq!(token_client.balance(&freelancer), 9_000_000_000i128); // Received 900 XLM
+    assert_eq!(token_client.balance(&client_addr), 31_000_000_000i128); // Original 40,000_000_000 - 15,000_000_000 + 6,000_000_000 = 31,000_000_000
+    assert_eq!(client.get_locked_balance(), 0i128);
+}
+
+#[test]
+fn test_p2p_dispute_proposal_and_reject() {
+    let env = Env::default();
+    let (freelancer, client_addr, token, oracle, mediator, client) = setup_test_env(&env);
+    
+    let milestones = soroban_sdk::vec![&env, Milestone {
+        payout_amount_usd: 10000,
+        max_revisions: 2,
+        revisions_used: 0,
+        state: MilestoneState::Locked,
+    }];
+
+    client.initialize(
+        &freelancer,
+        &client_addr,
+        &token,
+        &oracle,
+        &mediator,
+        &5000,
+        &1000,
+        &milestones,
+        &1209600,
+        &2592000,
+    );
+
+    let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
+    env.mock_all_auths();
+    stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
+    client.fund(&client_addr, &30_000_000_000i128);
+
+    // Request mediation (file dispute)
+    client.request_mediation(&client_addr);
+
+    // Propose split
+    let f_payout = 9_000_000_000i128;
+    let c_refund = 6_000_000_000i128;
+    client.propose_dispute_split(&client_addr, &f_payout, &c_refund);
+
+    // Freelancer rejects proposal (burns funds)
+    client.reject_dispute_split(&freelancer);
+
+    // Verify final status and balances - funds remain in contract (locked/burned)
+    assert_eq!(client.get_status(), EscrowStatus::Cancelled);
+    let token_client = token::Client::new(&env, &token);
+    assert_eq!(token_client.balance(&freelancer), 0i128); // 0 payout
+    assert_eq!(token_client.balance(&client_addr), 25_000_000_000i128); // 0 refund (original 40B - 15B funded)
+    assert_eq!(client.get_locked_balance(), 0i128); // Balance cleared from contract balance record
+    assert_eq!(token_client.balance(&client.address), 15_000_000_000i128); // Tokens still sit in contract address but are stuck
+}
+
+#[test]
+fn test_p2p_dispute_timeout_50_50() {
+    let env = Env::default();
+    let (freelancer, client_addr, token, oracle, mediator, client) = setup_test_env(&env);
+    
+    let milestones = soroban_sdk::vec![&env, Milestone {
+        payout_amount_usd: 10000,
+        max_revisions: 2,
+        revisions_used: 0,
+        state: MilestoneState::Locked,
+    }];
+
+    client.initialize(
+        &freelancer,
+        &client_addr,
+        &token,
+        &oracle,
+        &mediator,
+        &5000,
+        &1000,
+        &milestones,
+        &1209600,
+        &2592000,
+    );
+
+    let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
+    env.mock_all_auths();
+    stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
+    client.fund(&client_addr, &30_000_000_000i128);
+
+    // Request mediation
+    client.request_mediation(&client_addr);
+
+    // Propose split
+    let f_payout = 9_000_000_000i128;
+    let c_refund = 6_000_000_000i128;
+    client.propose_dispute_split(&client_addr, &f_payout, &c_refund);
+
+    // Advance 7 days
+    env.ledger().set_timestamp(env.ledger().timestamp() + 604800);
+
+    // Claim dispute timeout
+    client.claim_dispute_timeout(&client_addr);
+
+    // Verify 50/50 distribution (7,500_000_000 stroops each)
+    assert_eq!(client.get_status(), EscrowStatus::Cancelled);
+    let token_client = token::Client::new(&env, &token);
+    assert_eq!(token_client.balance(&freelancer), 7_500_000_000i128); 
+    assert_eq!(token_client.balance(&client_addr), 32_500_000_000i128); // 40B - 15B + 7.5B = 32.5B
     assert_eq!(client.get_locked_balance(), 0i128);
 }

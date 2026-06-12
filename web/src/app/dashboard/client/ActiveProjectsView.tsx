@@ -3,22 +3,24 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
-import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, Coins } from 'lucide-react';
+import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, Coins, ShieldAlert } from 'lucide-react';
 import { Order, Gig } from '@/lib/mockGigs';
 import { ChatModal } from '@/components/ChatModal';
 import { DeliverablesModal } from '@/components/DeliverablesModal';
 import { StatusModal } from '@/components/StatusModal';
 import { CancelModal } from '@/components/CancelModal';
+import { DisputeModal } from '@/components/DisputeModal';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
 import { subscribeToClientOrders, updateOrderStatus, getGig } from '@/lib/db';
-import { deployAndInitializeEscrow, fundEscrow, getRequiredXlmForGig, getOraclePrice, cancelUnfunded, clientCancelWithKillFee } from '@/lib/contract';
+import { deployAndInitializeEscrow, fundEscrow, getRequiredXlmForGig, getOraclePrice, cancelUnfunded, clientCancelWithKillFee, requestMediation } from '@/lib/contract';
 import { getXlmBalance } from '@/lib/stellar';
 
 function getStatusBadge(order: Order) {
   if (order.status === 'pending_acceptance') return { text: 'Pending Acceptance', classes: 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' };
   if (order.status === 'awaiting_funding') return { text: 'Awaiting Funding', classes: 'bg-[#331133]/80 text-[#ff00ff] border border-[#ff00ff]/30 shadow-[0_0_8px_rgba(255,0,255,0.15)]' };
   if (order.status === 'delivered') return { text: 'Delivered', classes: 'bg-[#001a00]/80 text-[#39ff14] border border-[#39ff14]/30 shadow-[0_0_8px_rgba(57,255,20,0.15)]' };
+  if (order.status === 'disputed') return { text: 'Disputed', classes: 'bg-red-950/80 text-red-500 border border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]' };
   
   if (order.status === 'escrow_funded') {
     if (order.denialMessage) {
@@ -64,6 +66,7 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeDeliverablesOrder, setActiveDeliverablesOrder] = useState<Order | null>(null);
   const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
   const [activeCancelOrder, setActiveCancelOrder] = useState<Order | null>(null);
+  const [activeDisputeOrder, setActiveDisputeOrder] = useState<Order | null>(null);
 
   const { showToast, showLoading, hideLoading } = useNotification();
 
@@ -183,6 +186,32 @@ export const ActiveProjectsView: React.FC = () => {
     } catch (e: unknown) {
       console.error(e);
       showToast(`Cancellation failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
+    }
+  };
+
+  const handleDisputeProject = async (order: Order) => {
+    if (!address || !order.txHash) return showToast('Error: Missing contract or wallet data', 'error');
+    try {
+      showLoading('Initiating dispute on-chain...');
+      await requestMediation(order.txHash, address);
+
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: 'Dispute initiated by client.',
+      };
+
+      await updateOrderStatus(order.id, {
+        status: 'disputed',
+        changelogs: [...(order.changelogs || []), newChangelog]
+      });
+
+      showToast('Dispute initiated successfully!', 'success');
+    } catch (e: unknown) {
+      console.error(e);
+      showToast(`Failed to initiate dispute: ${e instanceof Error ? e.message : String(e)}`, 'error');
     } finally {
       hideLoading();
     }
@@ -364,7 +393,8 @@ export const ActiveProjectsView: React.FC = () => {
     { label: 'All Statuses', value: 'all' },
     { label: 'Pending Approval', value: 'pending_acceptance' },
     { label: 'Pending Escrow', value: 'awaiting_funding' },
-    { label: 'Active Escrow', value: 'escrow_funded' }
+    { label: 'Active Escrow', value: 'escrow_funded' },
+    { label: 'Disputed', value: 'disputed' }
   ];
 
   return (
@@ -455,6 +485,13 @@ export const ActiveProjectsView: React.FC = () => {
                       </button>
                     )}
                     <button
+                      title="Dispute Project"
+                      onClick={() => handleDisputeProject(order)}
+                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                    >
+                      <ShieldAlert className="w-5 h-5" />
+                    </button>
+                    <button
                       title="Cancel Project"
                       onClick={() => setActiveCancelOrder(order)}
                       className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
@@ -462,6 +499,15 @@ export const ActiveProjectsView: React.FC = () => {
                       <X className="w-5 h-5" />
                     </button>
                   </>
+                )}
+                {order.status === 'disputed' && (
+                  <button
+                    title="Dispute Panel"
+                    onClick={() => setActiveDisputeOrder(order)}
+                    className="p-2.5 rounded bg-yellow-500/20 border border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)] font-bold text-xs uppercase tracking-wider px-4 py-2"
+                  >
+                    Dispute Panel
+                  </button>
                 )}
 
                 <button
@@ -531,6 +577,17 @@ export const ActiveProjectsView: React.FC = () => {
           order={activeCancelOrder}
           onClose={() => setActiveCancelOrder(null)}
           onConfirm={() => handleCancelFunded(activeCancelOrder)}
+        />
+      )}
+
+      {activeDisputeOrder && address && (
+        <DisputeModal
+          order={activeDisputeOrder}
+          currentAddress={address}
+          onClose={() => setActiveDisputeOrder(null)}
+          onSuccess={() => {
+            setActiveDisputeOrder(null);
+          }}
         />
       )}
     </div>
