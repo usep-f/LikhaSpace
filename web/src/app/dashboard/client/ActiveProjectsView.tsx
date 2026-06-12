@@ -46,7 +46,7 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeDeliverablesOrder, setActiveDeliverablesOrder] = useState<Order | null>(null);
   const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
 
-  const { showToast } = useNotification();
+  const { showToast, showConfirm } = useNotification();
 
   React.useEffect(() => {
     if (!address) return;
@@ -240,8 +240,47 @@ export const ActiveProjectsView: React.FC = () => {
     }
   };
 
+  const handleCancelOrder = (orderId: string) => {
+    showConfirm(
+      'Cancel Order',
+      'Are you sure you want to cancel this order?',
+      async () => {
+        showToast('Cancelling order...', 'info');
+        try {
+          const { cancelOrder } = await import('@/lib/db');
+          await cancelOrder(orderId);
+          showToast('Order cancelled successfully', 'success');
+        } catch (e: unknown) {
+          console.error(e);
+          showToast(`Failed to cancel order: ${e instanceof Error ? e.message : String(e)}`, 'error');
+        }
+      }
+    );
+  };
+
+  const handleClaimRefund = (order: Order) => {
+    showConfirm(
+      'Claim Refund',
+      'Are you sure you want to claim a refund? This is only possible if the freelancer has been inactive past their required timeout period.',
+      async () => {
+        if (!address || !order.txHash) return;
+        showToast('Claiming refund on-chain...', 'info');
+        try {
+          const { claimRefundTimeout } = await import('@/lib/contract');
+          const { cancelOrder } = await import('@/lib/db');
+          await claimRefundTimeout(order.txHash, address);
+          await cancelOrder(order.id);
+          showToast('Refund claimed successfully', 'success');
+        } catch (e: unknown) {
+          console.error(e);
+          showToast(`Failed to claim refund: ${e instanceof Error ? e.message : String(e)}`, 'error');
+        }
+      }
+    );
+  };
+
   const filteredOrders = clientOrders.filter(order => {
-    if (order.status === 'completed') return false;
+    if (order.status === 'completed' || order.status === 'cancelled') return false;
     const matchesSearch =
       order.freelancerAddress.toLowerCase().includes(search.toLowerCase()) ||
       (order.gigInfo?.freelancerName.toLowerCase() || '').includes(search.toLowerCase()) ||
@@ -341,6 +380,22 @@ export const ActiveProjectsView: React.FC = () => {
               >
                 <Activity className="w-4 h-4" /> View Status
               </button>
+              {(order.status === 'pending_acceptance' || order.status === 'awaiting_funding') && (
+                <button
+                  onClick={() => handleCancelOrder(order.id)}
+                  className="w-full py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 font-heading font-bold text-xs uppercase hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  Cancel Order
+                </button>
+              )}
+              {order.status === 'escrow_funded' && (
+                <button
+                  onClick={() => handleClaimRefund(order)}
+                  className="w-full py-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 font-heading font-bold text-xs uppercase hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  Claim Timeout Refund
+                </button>
+              )}
             </div>
           </div>
         ))

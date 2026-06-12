@@ -25,6 +25,7 @@ export async function submitTransaction(txBuilder: TransactionBuilder) {
     throw new Error(`Simulation failed: ${simResponse.error}`);
   }
   const assembledTx = rpc.assembleTransaction(tx, simResponse);
+  (assembledTx as unknown as { baseFee: string }).baseFee = '0';
   const signedResponse = await Freighter.signTransaction(assembledTx.build().toXDR(), {
     networkPassphrase: NETWORK_PASSPHRASE,
   });
@@ -36,13 +37,20 @@ export async function submitTransaction(txBuilder: TransactionBuilder) {
   if (!signedTxXdr) {
     throw new Error('No signed transaction returned from Freighter.');
   }
-  const signedTx = TransactionBuilder.fromXDR(signedTxXdr, NETWORK_PASSPHRASE);
-  const submission = await server.sendTransaction(signedTx);
-  if (submission.status === 'ERROR') {
-    const errXdr = submission.errorResult ? submission.errorResult.toXDR('base64') : 'Unknown error';
-    throw new Error(`Submission failed: ${errXdr}`);
+  // Send the signed inner transaction to the sponsor API
+  const sponsorRes = await fetch('/api/sponsor-tx', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ txXdr: signedTxXdr }),
+  });
+  
+  if (!sponsorRes.ok) {
+    const errorText = await sponsorRes.text();
+    throw new Error(`Sponsorship API failed: ${errorText}`);
   }
-  return pollTransaction(submission.hash);
+  
+  const { hash } = await sponsorRes.json();
+  return pollTransaction(hash);
 }
 
 export async function pollTransaction(hash: string, maxAttempts = 60) {

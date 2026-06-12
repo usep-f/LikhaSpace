@@ -74,6 +74,14 @@ export async function createGig(gig: Gig): Promise<void> {
   await setProfileCID(address, cid);
 }
 
+export async function deleteGig(gigId: string, freelancerAddress: string): Promise<void> {
+  const profile = await getUserProfile(freelancerAddress);
+  if (!profile || !profile.gigs) return;
+  profile.gigs = profile.gigs.filter((g: Gig) => g.id !== gigId);
+  const cid = await uploadToIPFS(profile);
+  await setProfileCID(freelancerAddress, cid);
+}
+
 export async function getGig(gigId: string): Promise<Gig | null> {
   const allGigs = await getAllGigs();
   return allGigs.find(g => g.id === gigId) || null;
@@ -198,6 +206,10 @@ export async function updateOrderStatus(orderId: string, updates: Partial<Order>
     const cid = await uploadToIPFS(match.profile);
     await setProfileCID(match.clientAddr, cid);
   }
+}
+
+export async function cancelOrder(orderId: string): Promise<void> {
+  await updateOrderStatus(orderId, { status: 'cancelled' });
 }
 
 export function subscribeToClientOrders(clientAddress: string, callback: (orders: Order[]) => void) {

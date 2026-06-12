@@ -348,6 +348,16 @@ export async function refundRemaining(contractId: string, freelancerAddress: str
   return submitTransaction(txBuilder);
 }
 
+export async function claimRefundTimeout(contractId: string, clientAddress: string) {
+  const account = await server.getAccount(clientAddress);
+  const contract = new Contract(contractId);
+  
+  const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(contract.call('claim_refund_timeout', new Address(clientAddress).toScVal()));
+
+  return submitTransaction(txBuilder);
+}
+
 function parseEscrowStatus(val: xdr.ScVal): number {
   if (val.switch() === xdr.ScValType.scvVoid()) return 0;
   if (val.switch() === xdr.ScValType.scvSymbol()) {

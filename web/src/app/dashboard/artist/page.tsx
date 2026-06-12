@@ -48,7 +48,7 @@ const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void
 const ListingsView: React.FC = () => {
   const { address } = useWallet();
   const [gigs, setGigs] = useState<Gig[]>([]);
-  const { showToast } = useNotification();
+  const { showToast, showConfirm } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -132,6 +132,27 @@ const ListingsView: React.FC = () => {
     }
   };
 
+  const handleDeleteListing = (gigId: string) => {
+    showConfirm(
+      'Delete Listing',
+      'Are you sure you want to delete this listing? This action cannot be undone.',
+      async () => {
+        if (!address) return;
+        try {
+          showToast('Deleting listing...', 'info');
+          const { deleteGig } = await import('@/lib/db');
+          await deleteGig(gigId, address);
+          await loadGigs();
+          showToast('Listing deleted successfully', 'success');
+        } catch (e: unknown) {
+          console.error(e);
+          const msg = e instanceof Error ? e.message : String(e);
+          showToast(`Failed to delete listing: ${msg}`, 'error');
+        }
+      }
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -177,6 +198,12 @@ const ListingsView: React.FC = () => {
                  >
                    Edit
                  </button>
+                 <button
+                   onClick={() => handleDeleteListing(gig.id)}
+                   className="text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer shrink-0"
+                 >
+                   Delete
+                 </button>
                </div>
             </div>
           ))
@@ -217,7 +244,7 @@ const OrdersView: React.FC = () => {
     return () => unsubscribe();
   }, [address]);
 
-  const { showToast } = useNotification();
+  const { showToast, showConfirm } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -252,6 +279,28 @@ const OrdersView: React.FC = () => {
     }
   };
 
+  const handleCancelAndRefund = (order: Order) => {
+    showConfirm(
+      'Refund Client',
+      'Are you sure you want to cancel this order and refund the client? This action will return all locked XLM to the client and cannot be undone.',
+      async () => {
+        if (!address || !order.txHash) return;
+        try {
+          showToast('Refunding client on-chain...', 'info');
+          const { refundRemaining } = await import('@/lib/contract');
+          const { cancelOrder } = await import('@/lib/db');
+          await refundRemaining(order.txHash, address);
+          await cancelOrder(order.id);
+          showToast('Order cancelled and client refunded successfully', 'success');
+        } catch (e: unknown) {
+          console.error(e);
+          const msg = e instanceof Error ? e.message : String(e);
+          showToast(`Failed to refund client: ${msg}`, 'error');
+        }
+      }
+    );
+  };
+
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
@@ -259,8 +308,7 @@ const OrdersView: React.FC = () => {
     { label: 'All Orders', value: 'all' },
     { label: 'Pending Acceptance', value: 'pending_acceptance' },
     { label: 'Escrow Funded (Active)', value: 'escrow_funded' },
-    { label: 'Delivered', value: 'delivered' },
-    { label: 'Completed', value: 'completed' }
+    { label: 'Delivered', value: 'delivered' }
   ];
 
   return (
@@ -337,12 +385,20 @@ const OrdersView: React.FC = () => {
                  ) : (
                    <div className="flex gap-2">
                      {order.status === 'escrow_funded' && (
-                       <button
-                         onClick={() => setActiveSubmitOrder(order)}
-                         className="px-4 py-2 rounded bg-neoncyan border border-neoncyan/30 text-obsidian font-heading font-bold text-xs uppercase hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)] flex items-center gap-1"
-                       >
-                         <UploadCloud className="w-4 h-4" /> Submit Deliverables
-                       </button>
+                       <>
+                         <button
+                           onClick={() => setActiveSubmitOrder(order)}
+                           className="px-4 py-2 rounded bg-neoncyan border border-neoncyan/30 text-obsidian font-heading font-bold text-xs uppercase hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)] flex items-center gap-1"
+                         >
+                           <UploadCloud className="w-4 h-4" /> Submit Deliverables
+                         </button>
+                         <button
+                           onClick={() => handleCancelAndRefund(order)}
+                           className="px-4 py-2 rounded bg-red-500/10 border border-red-500/30 text-red-500 font-heading font-bold text-xs uppercase hover:bg-red-500/20 transition-all cursor-pointer flex items-center justify-center gap-1"
+                         >
+                           <X className="w-4 h-4" /> Refund Client
+                         </button>
+                       </>
                      )}
                      <button
                        onClick={() => setActiveChatOrder(order)}
@@ -419,7 +475,7 @@ const HistoryView: React.FC = () => {
     if (!address) return;
     getFreelancerOrders(address)
       .then(orders => {
-        setCompletedOrders(orders.filter(o => o.status === 'completed'));
+        setCompletedOrders(orders.filter(o => o.status === 'completed' || o.status === 'cancelled'));
       })
       .catch(console.error);
   }, [address]);
@@ -433,7 +489,9 @@ const HistoryView: React.FC = () => {
             <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col gap-4">
                <div className="flex justify-between items-start">
                  <div>
-                   <p className="text-xs uppercase font-bold tracking-wider text-green-400 mb-1">Completed Order</p>
+                   <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${order.status === 'cancelled' ? 'text-red-400' : 'text-green-400'}`}>
+                     {order.status === 'cancelled' ? 'Cancelled Order' : 'Completed Order'}
+                   </p>
                    <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
                    <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
                  </div>
