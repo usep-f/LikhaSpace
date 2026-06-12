@@ -33,6 +33,8 @@ pub enum EscrowStatus {
     Completed = 2,
     Disputed = 3,
     Cancelled = 4,
+    Settled = 5,
+    Mediation = 6,
 }
 
 #[contracttype]
@@ -51,6 +53,14 @@ pub struct EscrowConfig {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DisputeProposal {
+    pub proposer: Address,
+    pub freelancer_payout: i128,
+    pub client_refund: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Config,
     Status,
@@ -59,6 +69,8 @@ pub enum DataKey {
     LastInteractionTimestamp,
     LockedXlmBalance, // Stroops locked
     StroopsPerCent, // Stored oracle conversion rate at funding
+    UpfrontReleased,
+    DisputeProposal,
 }
 
 #[contracttype]
@@ -139,6 +151,7 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::Milestones, &milestones);
         env.storage().instance().set(&DataKey::CurrentMilestoneIdx, &0u32);
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::UpfrontReleased, &false);
     }
 
     pub fn fund(env: Env, client: Address, max_xlm_to_spend: i128) {
@@ -164,16 +177,11 @@ impl LikhaEscrow {
         let token_client = token::Client::new(&env, &config.token);
         token_client.transfer(&client, &env.current_contract_address(), &total_xlm_required);
 
-        // Release upfront amount immediately
-        let upfront_xlm = config.upfront_amount_usd * stroops_per_cent;
-        if upfront_xlm > 0 {
-            token_client.transfer(&env.current_contract_address(), &config.freelancer, &upfront_xlm);
-        }
-
-        let locked_xlm = total_xlm_required - upfront_xlm;
+        let locked_xlm = total_xlm_required;
         env.storage().instance().set(&DataKey::LockedXlmBalance, &locked_xlm);
         env.storage().instance().set(&DataKey::StroopsPerCent, &stroops_per_cent);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Funded);
+        env.storage().instance().set(&DataKey::UpfrontReleased, &false);
         
         let mut new_milestones = milestones;
         if new_milestones.len() > 0 {
@@ -340,26 +348,153 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Disputed);
     }
 
-    pub fn resolve_dispute(env: Env, mediator: Address, freelancer_payout: i128, client_refund: i128) {
+    pub fn escalate_to_mediator(env: Env, caller: Address) {
         let config = get_config(&env);
-        assert_eq!(mediator, config.mediator, "Only mediator");
-        mediator.require_auth();
+        assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
+        caller.require_auth();
+        check_status(&env, EscrowStatus::Disputed);
+
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Mediation);
+        if env.storage().instance().has(&DataKey::DisputeProposal) {
+            env.storage().instance().remove(&DataKey::DisputeProposal);
+        }
+        set_interaction(&env);
+    }
+
+    pub fn propose_dispute_split(
+        env: Env,
+        proposer: Address,
+        freelancer_payout: i128,
+        client_refund: i128,
+    ) {
+        let config = get_config(&env);
+        assert!(proposer == config.client || proposer == config.freelancer, "Only client or freelancer");
+        proposer.require_auth();
         check_status(&env, EscrowStatus::Disputed);
 
         let locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
         assert_eq!(freelancer_payout + client_refund, locked_xlm, "Must distribute exact locked balance");
 
+        let proposal = DisputeProposal {
+            proposer,
+            freelancer_payout,
+            client_refund,
+        };
+
+        env.storage().instance().set(&DataKey::DisputeProposal, &proposal);
+        set_interaction(&env);
+    }
+
+    pub fn accept_dispute_split(env: Env, caller: Address) {
+        let config = get_config(&env);
+        assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
+        caller.require_auth();
+        check_status(&env, EscrowStatus::Disputed);
+
+        let proposal: DisputeProposal = env
+            .storage()
+            .instance()
+            .get(&DataKey::DisputeProposal)
+            .expect("No active dispute proposal");
+
+        assert_ne!(caller, proposal.proposer, "Cannot accept own proposal");
+
         let token_client = token::Client::new(&env, &config.token);
-        
+
+        if proposal.freelancer_payout > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.freelancer, &proposal.freelancer_payout);
+        }
+        if proposal.client_refund > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.client, &proposal.client_refund);
+        }
+
+        env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+    }
+
+    pub fn reject_dispute_split(env: Env, caller: Address) {
+        let config = get_config(&env);
+        assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
+        caller.require_auth();
+        check_status(&env, EscrowStatus::Disputed);
+
+        let proposal: DisputeProposal = env
+            .storage()
+            .instance()
+            .get(&DataKey::DisputeProposal)
+            .expect("No active dispute proposal");
+
+        assert_ne!(caller, proposal.proposer, "Cannot reject own proposal");
+
+        env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+    }
+
+    pub fn claim_dispute_timeout(env: Env, caller: Address) {
+        let config = get_config(&env);
+        assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
+        caller.require_auth();
+        check_status(&env, EscrowStatus::Disputed);
+
+        let _proposal: DisputeProposal = env
+            .storage()
+            .instance()
+            .get(&DataKey::DisputeProposal)
+            .expect("No active dispute proposal");
+
+        let last_time: u64 = env.storage().instance().get(&DataKey::LastInteractionTimestamp).unwrap();
+        let now = env.ledger().timestamp();
+        assert!(now >= last_time + 604800, "7-day dispute timeout not reached");
+
+        let locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
+        assert!(locked_xlm > 0, "No locked funds to split");
+
+        let freelancer_payout = locked_xlm / 2;
+        let client_refund = locked_xlm - freelancer_payout;
+
+        let token_client = token::Client::new(&env, &config.token);
+
         if freelancer_payout > 0 {
             token_client.transfer(&env.current_contract_address(), &config.freelancer, &freelancer_payout);
         }
         if client_refund > 0 {
             token_client.transfer(&env.current_contract_address(), &config.client, &client_refund);
         }
-        
+
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
-        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled); // Or Resolved
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+    }
+
+    pub fn resolve_dispute(
+        env: Env,
+        mediator: Address,
+        freelancer_payout: i128,
+        client_refund: i128,
+    ) {
+        let config = get_config(&env);
+        assert_eq!(mediator, config.mediator, "Only mediator");
+        mediator.require_auth();
+        check_status(&env, EscrowStatus::Mediation);
+
+        let locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
+        assert_eq!(freelancer_payout + client_refund, locked_xlm, "Must distribute exact locked balance");
+
+        let token_client = token::Client::new(&env, &config.token);
+
+        if freelancer_payout > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.freelancer, &freelancer_payout);
+        }
+        if client_refund > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.client, &client_refund);
+        }
+
+        env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Settled);
+        set_interaction(&env);
+    }
+
+    pub fn get_dispute_proposal(env: Env) -> Option<DisputeProposal> {
+        env.storage().instance().get(&DataKey::DisputeProposal)
     }
 
     pub fn claim_timeout(env: Env, freelancer: Address) {
@@ -396,6 +531,55 @@ impl LikhaEscrow {
         assert!(now >= last_time + config.freelancer_timeout, "Freelancer timeout not reached");
 
         Self::internal_refund_all_to_client(&env);
+    }
+
+    pub fn cancel_unfunded(env: Env, caller: Address) {
+        let config = get_config(&env);
+        assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
+        caller.require_auth();
+        check_status(&env, EscrowStatus::Unfunded);
+
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+    }
+
+    pub fn client_cancel_with_kill_fee(env: Env, client: Address) {
+        let config = get_config(&env);
+        assert_eq!(client, config.client, "Only client");
+        client.require_auth();
+        check_status(&env, EscrowStatus::Funded);
+
+        Self::internal_refund_all_to_client(&env);
+    }
+
+    pub fn release_upfront(env: Env, client: Address) {
+        let config = get_config(&env);
+        assert_eq!(client, config.client, "Only client can release upfront");
+        client.require_auth();
+        check_status(&env, EscrowStatus::Funded);
+
+        let upfront_released: bool = env.storage().instance().get(&DataKey::UpfrontReleased).unwrap_or(false);
+        assert!(!upfront_released, "Upfront already released");
+
+        let stroops_per_cent: i128 = env.storage().instance().get(&DataKey::StroopsPerCent).unwrap();
+        let upfront_xlm = config.upfront_amount_usd * stroops_per_cent;
+
+        if upfront_xlm > 0 {
+            let mut locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
+            assert!(locked_xlm >= upfront_xlm, "Insufficient locked balance");
+
+            let token_client = token::Client::new(&env, &config.token);
+            token_client.transfer(&env.current_contract_address(), &config.freelancer, &upfront_xlm);
+
+            locked_xlm -= upfront_xlm;
+            env.storage().instance().set(&DataKey::LockedXlmBalance, &locked_xlm);
+        }
+
+        env.storage().instance().set(&DataKey::UpfrontReleased, &true);
+        set_interaction(&env);
+    }
+
+    pub fn is_upfront_released(env: Env) -> bool {
+        env.storage().instance().get(&DataKey::UpfrontReleased).unwrap_or(false)
     }
 
     pub fn get_config(env: Env) -> EscrowConfig {

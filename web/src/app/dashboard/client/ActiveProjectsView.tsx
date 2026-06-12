@@ -3,21 +3,25 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
-import { MessageSquare, ExternalLink, ShieldCheck, Activity } from 'lucide-react';
+import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, Coins, ShieldAlert } from 'lucide-react';
 import { Order, Gig } from '@/lib/mockGigs';
 import { ChatModal } from '@/components/ChatModal';
 import { DeliverablesModal } from '@/components/DeliverablesModal';
 import { StatusModal } from '@/components/StatusModal';
+import { CancelModal } from '@/components/CancelModal';
+import { DisputeModal } from '@/components/DisputeModal';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
 import { subscribeToClientOrders, updateOrderStatus, getGig } from '@/lib/db';
-import { deployAndInitializeEscrow, fundEscrow, getRequiredXlmForGig, getOraclePrice } from '@/lib/contract';
+import { deployAndInitializeEscrow, fundEscrow, getRequiredXlmForGig, getOraclePrice, cancelUnfunded, clientCancelWithKillFee, requestMediation } from '@/lib/contract';
 import { getXlmBalance } from '@/lib/stellar';
 
 function getStatusBadge(order: Order) {
   if (order.status === 'pending_acceptance') return { text: 'Pending Acceptance', classes: 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' };
   if (order.status === 'awaiting_funding') return { text: 'Awaiting Funding', classes: 'bg-[#331133]/80 text-[#ff00ff] border border-[#ff00ff]/30 shadow-[0_0_8px_rgba(255,0,255,0.15)]' };
   if (order.status === 'delivered') return { text: 'Delivered', classes: 'bg-[#001a00]/80 text-[#39ff14] border border-[#39ff14]/30 shadow-[0_0_8px_rgba(57,255,20,0.15)]' };
+  if (order.status === 'disputed') return { text: 'Disputed', classes: 'bg-red-950/80 text-red-500 border border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]' };
+  if (order.status === 'mediation') return { text: 'In Mediation', classes: 'bg-orange-950/80 text-orange-500 border border-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.15)]' };
   
   if (order.status === 'escrow_funded') {
     if (order.denialMessage) {
@@ -62,6 +66,8 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
   const [activeDeliverablesOrder, setActiveDeliverablesOrder] = useState<Order | null>(null);
   const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
+  const [activeCancelOrder, setActiveCancelOrder] = useState<Order | null>(null);
+  const [activeDisputeOrder, setActiveDisputeOrder] = useState<Order | null>(null);
 
   const { showToast, showLoading, hideLoading } = useNotification();
 
@@ -126,6 +132,114 @@ export const ActiveProjectsView: React.FC = () => {
     } catch (e: unknown) {
       console.error(e);
       showToast(`Funding failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
+    }
+  };
+
+  const handleCancelUnfunded = async (order: Order) => {
+    if (!address) return showToast('Wallet not connected', 'error');
+    try {
+      showLoading('Canceling booking on-chain...');
+      if (order.txHash) {
+        await cancelUnfunded(order.txHash, address);
+      }
+
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: 'Booking cancelled by client before funding.',
+      };
+
+      await updateOrderStatus(order.id, {
+        status: 'denied',
+        changelogs: [...(order.changelogs || []), newChangelog]
+      });
+
+      showToast('Booking cancelled successfully!', 'success');
+    } catch (e: unknown) {
+      console.error(e);
+      showToast(`Cancellation failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
+    }
+  };
+
+  const handleCancelFunded = async (order: Order) => {
+    if (!address || !order.txHash) return showToast('Missing contract or wallet data', 'error');
+    try {
+      showLoading('Canceling project with kill fee on-chain...');
+      await clientCancelWithKillFee(order.txHash, address);
+
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: 'Project cancelled by client. Current milestone payout paid as kill fee, future milestones refunded.',
+      };
+
+      await updateOrderStatus(order.id, {
+        status: 'denied',
+        changelogs: [...(order.changelogs || []), newChangelog]
+      });
+
+      showToast('Project cancelled and refunded successfully!', 'success');
+      setActiveCancelOrder(null);
+    } catch (e: unknown) {
+      console.error(e);
+      showToast(`Cancellation failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
+    }
+  };
+
+  const handleDisputeProject = async (order: Order) => {
+    if (!address || !order.txHash) return showToast('Error: Missing contract or wallet data', 'error');
+    try {
+      showLoading('Initiating dispute on-chain...');
+      await requestMediation(order.txHash, address);
+
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: 'Dispute initiated by client.',
+      };
+
+      await updateOrderStatus(order.id, {
+        status: 'disputed',
+        changelogs: [...(order.changelogs || []), newChangelog]
+      });
+
+      showToast('Dispute initiated successfully!', 'success');
+    } catch (e: unknown) {
+      console.error(e);
+      showToast(`Failed to initiate dispute: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
+    }
+  };
+
+  const handleReleaseUpfront = async (order: Order) => {
+    if (!address || !order.txHash) return showToast('Error: Missing contract data', 'error');
+    try {
+      showLoading('Releasing upfront payment on-chain...');
+      const { releaseUpfront } = await import('@/lib/contract');
+      await releaseUpfront(order.txHash, address);
+
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: 'Upfront payment released by client.',
+      };
+
+      await updateOrderStatus(order.id, {
+        upfrontReleased: true,
+        changelogs: [...(order.changelogs || []), newChangelog]
+      });
+
+      showToast('Upfront payment successfully released!', 'success');
+    } catch (e: unknown) {
+      console.error(e);
+      showToast(`Release failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
     } finally {
       hideLoading();
     }
@@ -265,12 +379,15 @@ export const ActiveProjectsView: React.FC = () => {
   };
 
   const filteredOrders = clientOrders.filter(order => {
-    if (order.status === 'completed') return false;
+    if (order.status === 'completed' || order.status === 'denied' || order.status === 'settled_dispute') return false;
     const matchesSearch =
       order.freelancerAddress.toLowerCase().includes(search.toLowerCase()) ||
       (order.gigInfo?.freelancerName.toLowerCase() || '').includes(search.toLowerCase()) ||
       (order.gigInfo?.title.toLowerCase() || '').includes(search.toLowerCase());
-    return matchesSearch && (statusFilter === 'all' || order.status === statusFilter);
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'disputed' && (order.status === 'disputed' || order.status === 'mediation')) || 
+      order.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -280,7 +397,8 @@ export const ActiveProjectsView: React.FC = () => {
     { label: 'All Statuses', value: 'all' },
     { label: 'Pending Approval', value: 'pending_acceptance' },
     { label: 'Pending Escrow', value: 'awaiting_funding' },
-    { label: 'Active Escrow', value: 'escrow_funded' }
+    { label: 'Active Escrow', value: 'escrow_funded' },
+    { label: 'Disputed', value: 'disputed' }
   ];
 
   return (
@@ -322,8 +440,10 @@ export const ActiveProjectsView: React.FC = () => {
                   <span className="font-bold text-white">${order.priceUSD} USD</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Upfront Released ({order.upfrontPercentage}%):</span>
-                  <span className="font-bold text-neongreen">${(order.priceUSD * (order.upfrontPercentage / 100)).toFixed(2)} USD</span>
+                  <span className="text-gray-400">Upfront Payment ({order.upfrontPercentage}%):</span>
+                  <span className={`font-bold ${order.upfrontReleased ? 'text-neongreen' : 'text-yellow-500'}`}>
+                    ${(order.priceUSD * (order.upfrontPercentage / 100)).toFixed(2)} USD {order.upfrontReleased ? '(Released)' : '(Locked)'}
+                  </span>
                 </div>
               </div>
               {order.status === 'pending_acceptance' && (
@@ -340,12 +460,57 @@ export const ActiveProjectsView: React.FC = () => {
 
               <div className="flex gap-2 flex-wrap justify-end">
                 {order.status === 'awaiting_funding' && (
+                  <>
+                    <button
+                      title="Fund Escrow"
+                      onClick={() => handleFundEscrow(order)}
+                      className="p-2.5 rounded bg-[#ff00ff]/20 border border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
+                    >
+                      <Activity className="w-5 h-5" />
+                    </button>
+                    <button
+                      title="Cancel Booking"
+                      onClick={() => handleCancelUnfunded(order)}
+                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+                {order.status === 'escrow_funded' && (
+                  <>
+                    {order.upfrontPercentage > 0 && !order.upfrontReleased && (
+                      <button
+                        title="Release Upfront Payment"
+                        onClick={() => handleReleaseUpfront(order)}
+                        className="p-2.5 rounded bg-neongreen/20 border border-neongreen text-neongreen hover:bg-neongreen/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(57,255,20,0.2)]"
+                      >
+                        <Coins className="w-5 h-5" />
+                      </button>
+                    )}
+                    <button
+                      title="Dispute Project"
+                      onClick={() => handleDisputeProject(order)}
+                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                    >
+                      <ShieldAlert className="w-5 h-5" />
+                    </button>
+                    <button
+                      title="Cancel Project"
+                      onClick={() => setActiveCancelOrder(order)}
+                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+                {(order.status === 'disputed' || order.status === 'mediation') && (
                   <button
-                    title="Fund Escrow"
-                    onClick={() => handleFundEscrow(order)}
-                    className="p-2.5 rounded bg-[#ff00ff]/20 border border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
+                    title="Dispute Panel"
+                    onClick={() => setActiveDisputeOrder(order)}
+                    className="p-2.5 rounded bg-yellow-500/20 border border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)] font-bold text-xs uppercase tracking-wider px-4 py-2"
                   >
-                    <Activity className="w-5 h-5" />
+                    Dispute Panel
                   </button>
                 )}
 
@@ -408,6 +573,25 @@ export const ActiveProjectsView: React.FC = () => {
         <StatusModal
           order={activeStatusOrder}
           onClose={() => setActiveStatusOrder(null)}
+        />
+      )}
+
+      {activeCancelOrder && (
+        <CancelModal
+          order={activeCancelOrder}
+          onClose={() => setActiveCancelOrder(null)}
+          onConfirm={() => handleCancelFunded(activeCancelOrder)}
+        />
+      )}
+
+      {activeDisputeOrder && address && (
+        <DisputeModal
+          order={activeDisputeOrder}
+          currentAddress={address}
+          onClose={() => setActiveDisputeOrder(null)}
+          onSuccess={() => {
+            setActiveDisputeOrder(null);
+          }}
         />
       )}
     </div>

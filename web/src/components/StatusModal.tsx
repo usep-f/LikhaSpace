@@ -8,7 +8,7 @@ interface StatusModalProps {
 }
 
 export const StatusModal: React.FC<StatusModalProps> = ({ order, onClose }) => {
-  const isDisputed = order.status === 'disputed';
+  const isDisputed = order.status === 'disputed' || order.status === 'mediation';
   const isDenied = order.status === 'denied';
   
   const milestones = order.milestones || [];

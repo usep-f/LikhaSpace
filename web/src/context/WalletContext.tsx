@@ -5,7 +5,7 @@ import { doc, getDoc, setDoc, deleteDoc, DocumentData } from 'firebase/firestore
 import { db } from '../lib/firebase';
 import { useNotification } from './NotificationContext';
 
-export type UserRole = 'artist' | 'client';
+export type UserRole = 'artist' | 'client' | 'mediator';
 
 export interface UserProfile {
   name: string;
@@ -152,7 +152,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       throw new Error('Freighter wallet extension was not detected. Please install it.');
     }
     return withTimeout(
-      freighter.getAddress(),
+      freighter.requestAccess(),
       'Request timed out waiting for wallet response.'
     );
   };

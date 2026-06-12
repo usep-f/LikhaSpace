@@ -56,7 +56,7 @@ export async function getFreelancerOrders(freelancerAddress: string): Promise<Or
 }
 
 export async function getDisputedOrders(): Promise<Order[]> {
-  const q = query(collection(db, 'orders'), where('status', '==', 'disputed'));
+  const q = query(collection(db, 'orders'), where('status', 'in', ['disputed', 'mediation']));
   const snap = await getDocs(q);
   return snap.docs.map(d => d.data() as Order);
 }
@@ -77,6 +77,13 @@ export function subscribeToClientOrders(clientAddress: string, callback: (orders
 
 export function subscribeToFreelancerOrders(freelancerAddress: string, callback: (orders: Order[]) => void) {
   const q = query(collection(db, 'orders'), where('freelancerAddress', '==', freelancerAddress));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => d.data() as Order));
+  });
+}
+
+export function subscribeToMediatorOrders(callback: (orders: Order[]) => void) {
+  const q = query(collection(db, 'orders'), where('status', 'in', ['disputed', 'mediation', 'settled_dispute']));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => d.data() as Order));
   });

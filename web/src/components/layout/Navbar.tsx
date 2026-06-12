@@ -115,8 +115,6 @@ export const Navbar: React.FC = () => {
               <Link href="/dashboard/client" className="hover:text-neoncyan transition-colors">Client</Link>
               <span>•</span>
               <Link href="/dashboard/artist" className="hover:text-hotpink transition-colors">Freelancer</Link>
-              <span>•</span>
-              <Link href="/dashboard/mediator" className="hover:text-neongreen transition-colors">Mediator</Link>
             </div>
 
             {isConnected && address ? (
