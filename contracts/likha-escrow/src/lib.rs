@@ -51,6 +51,14 @@ pub struct EscrowConfig {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DisputeProposal {
+    pub proposer: Address,
+    pub freelancer_payout: i128,
+    pub client_refund: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Config,
     Status,
@@ -60,6 +68,7 @@ pub enum DataKey {
     LockedXlmBalance, // Stroops locked
     StroopsPerCent, // Stored oracle conversion rate at funding
     UpfrontReleased,
+    DisputeProposal,
 }
 
 #[contracttype]
@@ -337,26 +346,112 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Disputed);
     }
 
-    pub fn resolve_dispute(env: Env, mediator: Address, freelancer_payout: i128, client_refund: i128) {
+    pub fn propose_dispute_split(
+        env: Env,
+        proposer: Address,
+        freelancer_payout: i128,
+        client_refund: i128,
+    ) {
         let config = get_config(&env);
-        assert_eq!(mediator, config.mediator, "Only mediator");
-        mediator.require_auth();
+        assert!(proposer == config.client || proposer == config.freelancer, "Only client or freelancer");
+        proposer.require_auth();
         check_status(&env, EscrowStatus::Disputed);
 
         let locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
         assert_eq!(freelancer_payout + client_refund, locked_xlm, "Must distribute exact locked balance");
 
+        let proposal = DisputeProposal {
+            proposer,
+            freelancer_payout,
+            client_refund,
+        };
+
+        env.storage().instance().set(&DataKey::DisputeProposal, &proposal);
+        set_interaction(&env);
+    }
+
+    pub fn accept_dispute_split(env: Env, caller: Address) {
+        let config = get_config(&env);
+        assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
+        caller.require_auth();
+        check_status(&env, EscrowStatus::Disputed);
+
+        let proposal: DisputeProposal = env
+            .storage()
+            .instance()
+            .get(&DataKey::DisputeProposal)
+            .expect("No active dispute proposal");
+
+        assert_ne!(caller, proposal.proposer, "Cannot accept own proposal");
+
         let token_client = token::Client::new(&env, &config.token);
-        
+
+        if proposal.freelancer_payout > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.freelancer, &proposal.freelancer_payout);
+        }
+        if proposal.client_refund > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.client, &proposal.client_refund);
+        }
+
+        env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+    }
+
+    pub fn reject_dispute_split(env: Env, caller: Address) {
+        let config = get_config(&env);
+        assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
+        caller.require_auth();
+        check_status(&env, EscrowStatus::Disputed);
+
+        let proposal: DisputeProposal = env
+            .storage()
+            .instance()
+            .get(&DataKey::DisputeProposal)
+            .expect("No active dispute proposal");
+
+        assert_ne!(caller, proposal.proposer, "Cannot reject own proposal");
+
+        env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+    }
+
+    pub fn claim_dispute_timeout(env: Env, caller: Address) {
+        let config = get_config(&env);
+        assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
+        caller.require_auth();
+        check_status(&env, EscrowStatus::Disputed);
+
+        let _proposal: DisputeProposal = env
+            .storage()
+            .instance()
+            .get(&DataKey::DisputeProposal)
+            .expect("No active dispute proposal");
+
+        let last_time: u64 = env.storage().instance().get(&DataKey::LastInteractionTimestamp).unwrap();
+        let now = env.ledger().timestamp();
+        assert!(now >= last_time + 604800, "7-day dispute timeout not reached");
+
+        let locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
+        assert!(locked_xlm > 0, "No locked funds to split");
+
+        let freelancer_payout = locked_xlm / 2;
+        let client_refund = locked_xlm - freelancer_payout;
+
+        let token_client = token::Client::new(&env, &config.token);
+
         if freelancer_payout > 0 {
             token_client.transfer(&env.current_contract_address(), &config.freelancer, &freelancer_payout);
         }
         if client_refund > 0 {
             token_client.transfer(&env.current_contract_address(), &config.client, &client_refund);
         }
-        
+
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
-        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled); // Or Resolved
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+    }
+
+    pub fn get_dispute_proposal(env: Env) -> Option<DisputeProposal> {
+        env.storage().instance().get(&DataKey::DisputeProposal)
     }
 
     pub fn claim_timeout(env: Env, freelancer: Address) {
