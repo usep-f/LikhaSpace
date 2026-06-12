@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { WalletProvider } from '@/context/WalletContext';
 import { NotificationProvider } from '@/context/NotificationContext';
+import { TransactionProvider } from '@/context/TransactionContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import ProfileRegistrationModal from '@/components/ProfileRegistrationModal';
@@ -25,12 +26,14 @@ export default function RootLayout({
       <body className="antialiased flex flex-col min-h-screen">
         <NotificationProvider>
           <WalletProvider>
-            <Navbar />
-            <ProfileRegistrationModal />
-            <main className="grow">
-              {children}
-            </main>
-            <Footer />
+            <TransactionProvider>
+              <Navbar />
+              <ProfileRegistrationModal />
+              <main className="grow">
+                {children}
+              </main>
+              <Footer />
+            </TransactionProvider>
           </WalletProvider>
         </NotificationProvider>
       </body>

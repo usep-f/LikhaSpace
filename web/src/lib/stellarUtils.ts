@@ -7,6 +7,20 @@ import {
 import * as Freighter from '@stellar/freighter-api';
 import { server, NETWORK_PASSPHRASE } from './stellar';
 
+export type TxStatusListener = (status: { isProcessing: boolean; message: string }) => void;
+const listeners = new Set<TxStatusListener>();
+
+export function subscribeToTxStatus(listener: TxStatusListener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function notifyTxStatus(isProcessing: boolean, message: string = '') {
+  listeners.forEach(l => l({ isProcessing, message }));
+}
+
 async function validateActiveWallet(expectedAddr: string): Promise<void> {
   const freighterInfo = await Freighter.getAddress();
   const activeAddr = freighterInfo?.address;
@@ -18,39 +32,63 @@ async function validateActiveWallet(expectedAddr: string): Promise<void> {
 }
 
 export async function submitTransaction(txBuilder: TransactionBuilder) {
-  const tx = txBuilder.setTimeout(100).build();
-  await validateActiveWallet(tx.source);
-  const simResponse = await server.simulateTransaction(tx);
-  if (rpc.Api.isSimulationError(simResponse)) {
-    throw new Error(`Simulation failed: ${simResponse.error}`);
+  notifyTxStatus(true, 'Preparing transaction...');
+  try {
+    const tx = txBuilder.setTimeout(100).build();
+    await validateActiveWallet(tx.source);
+    
+    notifyTxStatus(true, 'Simulating transaction...');
+    const simResponse = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(simResponse)) {
+      throw new Error(`Simulation failed: ${simResponse.error}`);
+    }
+    const assembledTx = rpc.assembleTransaction(tx, simResponse);
+    (assembledTx as unknown as { baseFee: string }).baseFee = '0';
+    
+    notifyTxStatus(true, 'Awaiting Freighter approval...');
+    const signedResponse = await Freighter.signTransaction(assembledTx.build().toXDR(), {
+      networkPassphrase: NETWORK_PASSPHRASE,
+    });
+    if (signedResponse.error) {
+      throw new Error(`Signing failed: ${signedResponse.error}`);
+    }
+    const signedResponseObj = signedResponse as unknown as { signedTxXdr?: string, signedTransaction?: string };
+    const signedTxXdr = signedResponseObj.signedTxXdr || signedResponseObj.signedTransaction;
+    if (!signedTxXdr) {
+      throw new Error('No signed transaction returned from Freighter.');
+    }
+
+    // Save to localStorage for recovery
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('likha_pending_tx', signedTxXdr);
+    }
+
+    notifyTxStatus(true, 'Sponsoring gas fees...');
+    const sponsorRes = await fetch('/api/sponsor-tx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ txXdr: signedTxXdr }),
+    });
+    
+    if (!sponsorRes.ok) {
+      const errorText = await sponsorRes.text();
+      throw new Error(`Sponsorship API failed: ${errorText}`);
+    }
+    
+    const { hash } = await sponsorRes.json();
+    
+    notifyTxStatus(true, 'Confirming on-chain...');
+    const result = await pollTransaction(hash);
+
+    // Clear localStorage on success
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('likha_pending_tx');
+    }
+
+    return result;
+  } finally {
+    notifyTxStatus(false);
   }
-  const assembledTx = rpc.assembleTransaction(tx, simResponse);
-  (assembledTx as unknown as { baseFee: string }).baseFee = '0';
-  const signedResponse = await Freighter.signTransaction(assembledTx.build().toXDR(), {
-    networkPassphrase: NETWORK_PASSPHRASE,
-  });
-  if (signedResponse.error) {
-    throw new Error(`Signing failed: ${signedResponse.error}`);
-  }
-  const signedResponseObj = signedResponse as unknown as { signedTxXdr?: string, signedTransaction?: string };
-  const signedTxXdr = signedResponseObj.signedTxXdr || signedResponseObj.signedTransaction;
-  if (!signedTxXdr) {
-    throw new Error('No signed transaction returned from Freighter.');
-  }
-  // Send the signed inner transaction to the sponsor API
-  const sponsorRes = await fetch('/api/sponsor-tx', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ txXdr: signedTxXdr }),
-  });
-  
-  if (!sponsorRes.ok) {
-    const errorText = await sponsorRes.text();
-    throw new Error(`Sponsorship API failed: ${errorText}`);
-  }
-  
-  const { hash } = await sponsorRes.json();
-  return pollTransaction(hash);
 }
 
 export async function pollTransaction(hash: string, maxAttempts = 60) {
