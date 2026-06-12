@@ -5,7 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import { GigsFeed } from '@/components/GigsFeed';
 import { ProfileModal } from '@/components/ProfileModal';
 import { BookingModal } from '@/components/BookingModal';
-import { Gig, mockProfiles } from '@/lib/mockGigs';
+import { Gig, FreelancerProfile, Order } from '@/lib/mockGigs';
+import { useNotification } from '@/context/NotificationContext';
+import { useWallet } from '@/context/WalletContext';
+import { createOrder, getUserProfile } from '@/lib/db';
 
 function GigsContent() {
   const searchParams = useSearchParams();
@@ -16,19 +19,70 @@ function GigsContent() {
   const [prevSearchParam, setPrevSearchParam] = useState(initialSearch);
 
   // Derive state during render instead of using useEffect
-  // See: https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
   if (initialSearch !== prevSearchParam) {
     setPrevSearchParam(initialSearch);
     setCurrentSearch(initialSearch);
   }
 
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<FreelancerProfile | null>(null);
   const [selectedGigToBook, setSelectedGigToBook] = useState<Gig | null>(null);
 
-  const handleBookGig = (gig: Gig, message: string) => {
-    console.log(`Booking gig: ${gig.id} with message: ${message}`);
-    alert(`Booking request sent for "${gig.title}". This will trigger the Escrow initialization upon Freelancer acceptance.`);
-    setSelectedGigToBook(null);
+  const { showToast } = useNotification();
+  const { address } = useWallet();
+
+  const handleProfileClick = async (profileAddress: string) => {
+    try {
+      const p = await getUserProfile(profileAddress);
+      if (p) {
+        setSelectedProfile({
+          address: profileAddress,
+          name: p.name || 'Anonymous',
+          title: p.title || '',
+          bio: p.bio || '',
+          totalEarnedXLM: p.totalEarnedXLM || 0,
+          projectsCompleted: p.projectsCompleted || 0,
+          averageRating: p.averageRating || 5.0,
+          testimonials: p.testimonials || [],
+        });
+      } else {
+        showToast('Freelancer profile not found in database.', 'error');
+      }
+    } catch (err) {
+      console.error('Error loading profile:', err);
+      showToast('Failed to load freelancer profile.', 'error');
+    }
+  };
+
+  const handleBookGig = async (gig: Gig, message: string) => {
+    if (!address) {
+      showToast('Please connect your wallet to book a service.', 'error');
+      return;
+    }
+    showToast('Submitting booking request...', 'info');
+    try {
+      const orderId = crypto.randomUUID();
+      const order: Order = {
+        id: orderId,
+        gigId: gig.id,
+        clientAddress: address,
+        clientName: 'Client (' + address.slice(0, 4) + '...' + address.slice(-4) + ')',
+        freelancerAddress: gig.freelancerAddress,
+        status: 'pending_acceptance',
+        priceUSD: gig.priceUSD,
+        upfrontPercentage: gig.upfrontPercentage,
+        proposalText: message,
+        progressPercentage: 0,
+        changelogs: [],
+        chatMessages: [],
+        milestones: gig.milestones || [],
+      };
+      await createOrder(order);
+      showToast(`Booking request sent for "${gig.title}". This will trigger the Escrow initialization upon Freelancer acceptance.`, 'success');
+      setSelectedGigToBook(null);
+    } catch (err: unknown) {
+      console.error('Booking failed:', err);
+      showToast(err instanceof Error ? err.message : 'Booking request failed', 'error');
+    }
   };
 
   return (
@@ -36,15 +90,15 @@ function GigsContent() {
       <GigsFeed
         searchVal={currentSearch}
         onSearchChange={setCurrentSearch}
-        onProfileClick={(address) => setSelectedProfileId(address)}
+        onProfileClick={handleProfileClick}
         onBookClick={(gig) => setSelectedGigToBook(gig)}
       />
 
       {/* Modals */}
-      {selectedProfileId && mockProfiles[selectedProfileId] && (
+      {selectedProfile && (
         <ProfileModal
-          profile={mockProfiles[selectedProfileId]}
-          onClose={() => setSelectedProfileId(null)}
+          profile={selectedProfile}
+          onClose={() => setSelectedProfile(null)}
         />
       )}
 

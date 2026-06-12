@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { mockGigs, Gig } from '@/lib/mockGigs';
+import { Gig } from '@/lib/mockGigs';
 import { Tag, HelpCircle, ArrowUpRight, Star, Search } from 'lucide-react';
+import { getAllGigs } from '@/lib/db';
 
 // Sub-component: Status Badge
 const StatusBadge: React.FC<{ status: Gig['status'] }> = ({ status }) => {
@@ -29,7 +30,7 @@ const GigCard: React.FC<CardProps> = ({ gig,  onBookClick, onProfileClick }) => 
   return (
     <div className={`p-6 rounded-xl glass-card border flex flex-col justify-between space-y-4 transition-all ${
       gig.status === 'occupied'
-        ? 'opacity-60 border-white/5 grayscale-[50%]'
+        ? 'opacity-60 border-white/5 grayscale-50'
         : 'border-white/5 hover:border-hotpink/30 hover:shadow-[0_0_14px_rgba(255,0,127,0.15)]'
     }`}>
       <div>
@@ -164,10 +165,24 @@ interface GigsFeedProps {
 
 export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onSearchChange, onProfileClick, onBookClick }) => {
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [gigs, setGigs] = useState<Gig[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
+
+  React.useEffect(() => {
+    getAllGigs()
+      .then((res) => {
+        setGigs(res);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load gigs:', err);
+        setLoading(false);
+      });
+  }, []);
 
   // Track filter changes by deriving state
   const [prevFilters, setPrevFilters] = useState({ searchVal, activeTab });
@@ -176,7 +191,8 @@ export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onSearchChange, o
     setCurrentPage(1); // Reset page on new search/filter
   }
 
-  const filteredGigs = mockGigs.filter((gig) => {
+  const filteredGigs = gigs.filter((gig) => {
+    if (gig.status === 'paused') return false;
     const matchesCategory = activeTab === 'all' || gig.category === activeTab;
     const searchLower = searchVal.toLowerCase();
     const matchesSearch = 
@@ -193,6 +209,14 @@ export const GigsFeed: React.FC<GigsFeedProps> = ({ searchVal, onSearchChange, o
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  if (loading) {
+    return (
+      <div className="text-center py-20 font-heading text-xs uppercase tracking-widest text-gray-400">
+        Loading services from database...
+      </div>
+    );
+  }
 
   return (
     <section id="feed" className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">

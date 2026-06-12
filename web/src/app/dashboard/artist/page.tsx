@@ -2,12 +2,17 @@
 
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
-import { Sparkles, PlusCircle, Check, X, Eye } from 'lucide-react';
-import { mockGigs, mockOrders, Order, Gig } from '@/lib/mockGigs';
+import { useNotification } from '@/context/NotificationContext';
+import { Sparkles, PlusCircle, Check, X, Eye, MessageSquare, Activity, UploadCloud } from 'lucide-react';
+import { Order, Gig, FreelancerProfile } from '@/lib/mockGigs';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
+import { subscribeToFreelancerOrders, updateOrderStatus, createGig, getFreelancerGigs, getUserProfile, getFreelancerOrders } from '@/lib/db';
 import { ProposalModal } from '@/components/ProposalModal';
 import { ListingModal } from '@/components/ListingModal';
+import { ChatModal } from '@/components/ChatModal';
+import { StatusModal } from '@/components/StatusModal';
+import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 
 // Sub-component: Stats
 const ReputationStatCard: React.FC<{ label: string; value: string; colorClass: string }> = ({ label, value, colorClass }) => (
@@ -41,7 +46,9 @@ const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void
 
 // Listings View
 const ListingsView: React.FC = () => {
-  const allMyGigs = mockGigs.filter(g => g.freelancerAddress === 'GDX7...R39P');
+  const { address } = useWallet();
+  const [gigs, setGigs] = useState<Gig[]>([]);
+  const { showToast } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -52,7 +59,22 @@ const ListingsView: React.FC = () => {
   const [isListingModalOpen, setIsListingModalOpen] = useState(false);
   const [editingGig, setEditingGig] = useState<Gig | null>(null);
 
-  const filteredGigs = allMyGigs.filter(gig => {
+  const loadGigs = React.useCallback(async () => {
+    if (!address) return;
+    try {
+      const res = await getFreelancerGigs(address);
+      setGigs(res);
+    } catch (err) {
+      console.error('Failed to load gigs:', err);
+    }
+  }, [address]);
+
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadGigs();
+  }, [loadGigs]);
+
+  const filteredGigs = gigs.filter(gig => {
     const matchesSearch = gig.title.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || gig.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -78,10 +100,36 @@ const ListingsView: React.FC = () => {
     setIsListingModalOpen(true);
   };
 
-  const handleSaveListing = (updatedGig: Partial<Gig>) => {
-    console.log('Saved listing data:', updatedGig);
-    alert('Listing saved successfully! (Mock Action)');
-    setIsListingModalOpen(false);
+  const handleSaveListing = async (updatedGig: Partial<Gig>) => {
+    if (!address) return showToast('Wallet not connected', 'error');
+    showToast('Saving service listing...', 'info');
+    try {
+      const profile = await getUserProfile(address);
+      const freelancerName = profile?.name || 'Freelancer';
+
+      const gigId = editingGig?.id || crypto.randomUUID();
+      const gig: Gig = {
+        id: gigId,
+        freelancerAddress: address,
+        freelancerName,
+        title: updatedGig.title || '',
+        category: updatedGig.category || 'design',
+        description: updatedGig.description || '',
+        priceUSD: updatedGig.priceUSD || 100,
+        upfrontPercentage: updatedGig.upfrontPercentage || 20,
+        tags: updatedGig.tags || [],
+        status: updatedGig.status || 'active',
+        milestones: updatedGig.milestones || [],
+      };
+      await createGig(gig);
+      await loadGigs();
+      showToast('Listing saved successfully!', 'success');
+      setIsListingModalOpen(false);
+    } catch (e: unknown) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Failed to save listing: ${msg}`, 'error');
+    }
   };
 
   return (
@@ -158,7 +206,18 @@ const ListingsView: React.FC = () => {
 
 // Orders View
 const OrdersView: React.FC = () => {
-  const myOrders = mockOrders.filter(o => o.freelancerAddress === 'GDX7...R39P');
+  const { address } = useWallet();
+  const [myOrders, setMyOrders] = useState<Order[]>([]);
+
+  React.useEffect(() => {
+    if (!address) return;
+    const unsubscribe = subscribeToFreelancerOrders(address, (orders) => {
+      setMyOrders(orders);
+    });
+    return () => unsubscribe();
+  }, [address]);
+
+  const { showToast } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -171,12 +230,27 @@ const OrdersView: React.FC = () => {
 
   // Modal State
   const [activeProposalOrder, setActiveProposalOrder] = useState<Order | null>(null);
+  const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
+  const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
+  const [activeSubmitOrder, setActiveSubmitOrder] = useState<Order | null>(null);
 
   const filteredOrders = myOrders.filter(order => {
+    if (order.status === 'completed') return false;
     const matchesSearch = order.clientName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const handleAcceptBooking = async (orderId: string) => {
+    showToast('Accepting booking request...', 'info');
+    try {
+      await updateOrderStatus(orderId, { status: 'awaiting_funding' });
+      showToast('Booking accepted! Waiting for client to fund the escrow.', 'success');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Error accepting booking: ${msg}`, 'error');
+    }
+  };
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -233,7 +307,10 @@ const OrdersView: React.FC = () => {
                        >
                          <Eye className="w-4 h-4" /> View Proposal
                        </button>
-                       <button className="px-4 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer">
+                       <button
+                         onClick={() => handleAcceptBooking(order.id)}
+                         className="px-4 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                       >
                          <Check className="w-4 h-4" /> Accept
                        </button>
                        <button
@@ -259,8 +336,25 @@ const OrdersView: React.FC = () => {
                    )
                  ) : (
                    <div className="flex gap-2">
-                     <button className="px-4 py-2 rounded bg-white/5 border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors cursor-pointer">
-                       Open Workspace
+                     {order.status === 'escrow_funded' && (
+                       <button
+                         onClick={() => setActiveSubmitOrder(order)}
+                         className="px-4 py-2 rounded bg-neoncyan border border-neoncyan/30 text-obsidian font-heading font-bold text-xs uppercase hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)] flex items-center gap-1"
+                       >
+                         <UploadCloud className="w-4 h-4" /> Submit Deliverables
+                       </button>
+                     )}
+                     <button
+                       onClick={() => setActiveChatOrder(order)}
+                       className="px-4 py-2 rounded bg-[#141026] border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/5 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                     >
+                       <MessageSquare className="w-4 h-4" /> Message
+                     </button>
+                     <button
+                       onClick={() => setActiveStatusOrder(order)}
+                       className="px-4 py-2 rounded bg-white text-black font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                     >
+                       <Activity className="w-4 h-4" /> View Status
                      </button>
                    </div>
                  )}
@@ -286,13 +380,199 @@ const OrdersView: React.FC = () => {
           onClose={() => setActiveProposalOrder(null)}
         />
       )}
+
+      {activeChatOrder && (
+        <ChatModal
+          order={activeChatOrder}
+          currentAddress={address!}
+          onClose={() => setActiveChatOrder(null)}
+        />
+      )}
+
+      {activeStatusOrder && (
+        <StatusModal
+          order={activeStatusOrder}
+          onClose={() => setActiveStatusOrder(null)}
+        />
+      )}
+
+      {activeSubmitOrder && (
+        <SubmitDeliverableModal
+          order={activeSubmitOrder}
+          onClose={() => setActiveSubmitOrder(null)}
+          onSuccess={() => {
+            setActiveSubmitOrder(null);
+            showToast('Deliverables successfully submitted for review!', 'success');
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// History View
+const HistoryView: React.FC = () => {
+  const { address } = useWallet();
+  const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
+
+  React.useEffect(() => {
+    if (!address) return;
+    getFreelancerOrders(address)
+      .then(orders => {
+        setCompletedOrders(orders.filter(o => o.status === 'completed'));
+      })
+      .catch(console.error);
+  }, [address]);
+
+  return (
+    <div className="space-y-6">
+      <h3 className="font-heading font-bold text-lg text-white">Transaction History</h3>
+      <div className="space-y-4">
+        {completedOrders.length > 0 ? (
+          completedOrders.map(order => (
+            <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col gap-4">
+               <div className="flex justify-between items-start">
+                 <div>
+                   <p className="text-xs uppercase font-bold tracking-wider text-green-400 mb-1">Completed Order</p>
+                   <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
+                   <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
+                 </div>
+                 <div className="text-right">
+                   {order.txHash && (
+                     <p className="text-[10px] text-gray-500 font-mono mt-1">Tx: {order.txHash.slice(0, 16)}...</p>
+                   )}
+                 </div>
+               </div>
+               
+               {order.review && (
+                 <div className="bg-white/5 p-3 rounded-lg border border-white/5">
+                   <div className="flex items-center gap-1 mb-1">
+                     {[...Array(5)].map((_, i) => (
+                       <Sparkles key={i} className={`w-3 h-3 ${i < order.review!.rating ? 'text-yellow-400' : 'text-gray-600'}`} />
+                     ))}
+                   </div>
+                   <p className="text-xs text-gray-300 italic">&quot;{order.review.text}&quot;</p>
+                 </div>
+               )}
+            </div>
+          ))
+        ) : (
+          <div className="py-12 text-center border border-white/5 rounded-xl glass-card">
+            <p className="text-sm text-gray-400">No completed history found.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Profile Settings View
+const ProfileSettingsView: React.FC = () => {
+  const { userProfile, registerProfile, deleteProfile } = useWallet();
+  const { showToast, showConfirm } = useNotification();
+  const [formData, setFormData] = useState({
+    name: userProfile?.name || '',
+    email: userProfile?.email || '',
+    phone: userProfile?.phone || '',
+    title: userProfile?.title || '',
+    bio: userProfile?.bio || '',
+    category: userProfile?.category || '',
+    careerPath: userProfile?.careerPath || '',
+    github: userProfile?.github || '',
+    linkedin: userProfile?.linkedin || '',
+    twitter: userProfile?.twitter || '',
+    portfolio: userProfile?.portfolio || '',
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    void registerProfile(formData);
+    showToast('Profile updated successfully!', 'success');
+  };
+
+  const handleDelete = () => {
+    showConfirm(
+      'Delete Account',
+      'Are you sure you want to completely delete your account? Your personal data will be erased, but your on-chain transactions will remain safely recorded on the Stellar network under your wallet address.',
+      async () => {
+        await deleteProfile();
+        window.location.href = '/';
+      }
+    );
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <h3 className="font-heading font-bold text-lg text-white">Profile Settings</h3>
+      <form onSubmit={handleSave} className="space-y-4 p-6 glass-card rounded-xl border border-white/5">
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
+          <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+          <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Phone</label>
+          <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Professional Title</label>
+          <input type="text" name="title" value={formData.title} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">Bio</label>
+          <textarea name="bio" value={formData.bio} onChange={handleChange} rows={3} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+        </div>
+        <div className="flex justify-between pt-4 mt-4 border-t border-white/5">
+          <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-500/10 text-red-400 font-bold text-sm rounded hover:bg-red-500/20 transition-colors">
+            Delete Account
+          </button>
+          <button type="submit" className="px-6 py-2 bg-hotpink text-white font-bold text-sm rounded hover:bg-pink-600 transition-colors">
+            Save Changes
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
 
 export default function ArtistDashboard() {
-  const { isConnected } = useWallet();
+  const { isConnected, address } = useWallet();
   const [activeTab, setActiveTab] = useState('listings');
+  const [profile, setProfile] = useState<FreelancerProfile | null>(null);
+
+  React.useEffect(() => {
+    if (!address) return;
+    getUserProfile(address)
+      .then((p) => {
+        if (p) {
+          setProfile({
+            address,
+            name: p.name || 'Anonymous',
+            title: p.title || '',
+            bio: p.bio || '',
+            totalEarnedXLM: p.totalEarnedXLM || 0,
+            projectsCompleted: p.projectsCompleted || 0,
+            averageRating: p.averageRating || 5.0,
+            testimonials: p.testimonials || [],
+          });
+        } else {
+          setProfile(null);
+        }
+      })
+      .catch(console.error);
+  }, [address]);
+
+  // Calculate dynamic stats
+  const totalEarned = profile?.totalEarnedXLM || 0;
+  const completed = profile?.projectsCompleted || 0;
+  const rating = profile?.averageRating || 5.0;
 
   return (
     <div className="min-h-screen bg-obsidian text-white py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -309,9 +589,9 @@ export default function ArtistDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <ReputationStatCard label="Total XLM Earned" value="12,500 XLM" colorClass="text-glow-green text-neongreen" />
-        <ReputationStatCard label="Gigs Completed" value="24 Projects" colorClass="text-glow-pink text-hotpink" />
-        <ReputationStatCard label="On-Chain Reputation" value="4.9 Rating" colorClass="text-glow-cyan text-neoncyan" />
+        <ReputationStatCard label="Total XLM Earned" value={`${totalEarned.toLocaleString()} XLM`} colorClass="text-glow-green text-neongreen" />
+        <ReputationStatCard label="Gigs Completed" value={`${completed} Projects`} colorClass="text-glow-pink text-hotpink" />
+        <ReputationStatCard label="On-Chain Reputation" value={`${rating.toFixed(1)} Rating`} colorClass="text-glow-cyan text-neoncyan" />
       </div>
 
       <div className="mt-8">
@@ -319,8 +599,8 @@ export default function ArtistDashboard() {
 
         {activeTab === 'listings' && <ListingsView />}
         {activeTab === 'orders' && <OrdersView />}
-        {activeTab === 'profile' && <p className="text-sm text-gray-400">Profile management coming soon.</p>}
-        {activeTab === 'history' && <p className="text-sm text-gray-400">Completed projects history coming soon.</p>}
+        {activeTab === 'profile' && <ProfileSettingsView />}
+        {activeTab === 'history' && <HistoryView />}
       </div>
     </div>
   );

@@ -47,7 +47,7 @@ const EscrowFlowMockup: React.FC = () => (
         </div>
         <div className="text-left">
           <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Step 3: Verification</p>
-          <p className="text-xs text-white">Work link review → balance released to Artist</p>
+          <p className="text-xs text-white">Work link review → balance released to Freelancer</p>
         </div>
       </div>
     </div>
@@ -143,12 +143,12 @@ interface HeroSectionProps {
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ searchVal, onSearchChange }) => {
-  const { isConnected, role, connectWallet, simulateWallet } = useWallet();
+  const { isConnected, role, connectWallet } = useWallet();
   const router = useRouter();
 
   const handleConnectAction = () => {
     if (!isConnected) {
-      connectWallet().catch(() => simulateWallet());
+      void connectWallet();
     }
   };
 

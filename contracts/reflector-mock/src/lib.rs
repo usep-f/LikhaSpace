@@ -1,14 +1,14 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+#![no_std]
+use soroban_sdk::{contract, contractimpl, Env};
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[contract]
+pub struct ReflectorMock;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+#[contractimpl]
+impl ReflectorMock {
+    /// Returns the number of XLM stroops equivalent to 1 USD cent.
+    /// Changed for testing: 1 cent = 10,000 stroops. So 1 XLM = $10.00 USD.
+    pub fn get_price(_env: Env) -> i128 {
+        10_000
     }
 }

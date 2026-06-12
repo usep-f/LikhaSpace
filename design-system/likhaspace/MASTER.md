@@ -7,8 +7,8 @@
 ---
 
 **Project:** LikhaSpace
-**Generated:** 2026-06-09 11:09:19
-**Category:** Cybersecurity Platform
+**Generated:** 2026-06-10 13:50:53
+**Category:** Marketplace (P2P)
 
 ---
 
@@ -28,14 +28,14 @@
 
 ### Typography
 
-- **Heading Font:** Archivo
-- **Body Font:** Space Grotesk
-- **Mood:** minimal, portfolio, designer, creative, clean, artistic
-- **Google Fonts:** [Archivo + Space Grotesk](https://fonts.google.com/share?selection.family=Archivo:wght@300;400;500;600;700|Space+Grotesk:wght@300;400;500;600;700)
+- **Heading Font:** Orbitron
+- **Body Font:** Exo 2
+- **Mood:** crypto, web3, futuristic, tech, blockchain, digital
+- **Google Fonts:** [Orbitron + Exo 2](https://fonts.google.com/share?selection.family=Exo+2:wght@300;400;500;600;700|Orbitron:wght@400;500;600;700)
 
 **CSS Import:**
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap');
 ```
 
 ### Spacing Variables
@@ -153,13 +153,13 @@
 
 ## Style Guidelines
 
-**Style:** Cyberpunk UI
+**Style:** Vibrant & Block-based
 
-**Keywords:** Neon, dark mode, terminal, HUD, sci-fi, glitch, dystopian, futuristic, matrix, tech noir
+**Keywords:** Bold, energetic, playful, block layout, geometric shapes, high color contrast, duotone, modern, energetic
 
-**Best For:** Gaming platforms, tech products, crypto apps, sci-fi applications, developer tools, entertainment
+**Best For:** Startups, creative agencies, gaming, social media, youth-focused, entertainment, consumer
 
-**Key Effects:** Neon glow (text-shadow), glitch animations (skew/offset), scanlines (::before overlay), terminal fonts
+**Key Effects:** Large sections (48px+ gaps), animated patterns, bold hover (color shift), scroll-snap, large type (32px+), 200-300ms
 
 ### Page Pattern
 
@@ -173,8 +173,8 @@
 
 ## Anti-Patterns (Do NOT Use)
 
-- ❌ Light mode
-- ❌ Poor data viz
+- ❌ Low trust signals
+- ❌ Confusing layout
 
 ### Additional Forbidden Patterns
 
