@@ -410,3 +410,51 @@ fn test_p2p_dispute_timeout_50_50() {
     assert_eq!(token_client.balance(&client_addr), 32_500_000_000i128); // 40B - 15B + 7.5B = 32.5B
     assert_eq!(client.get_locked_balance(), 0i128);
 }
+
+#[test]
+fn test_mediator_resolve_dispute() {
+    let env = Env::default();
+    let (freelancer, client_addr, token, oracle, mediator, client) = setup_test_env(&env);
+    
+    let milestones = soroban_sdk::vec![&env, Milestone {
+        payout_amount_usd: 10000,
+        max_revisions: 2,
+        revisions_used: 0,
+        state: MilestoneState::Locked,
+    }];
+
+    client.initialize(
+        &freelancer,
+        &client_addr,
+        &token,
+        &oracle,
+        &mediator,
+        &5000,
+        &1000,
+        &milestones,
+        &1209600,
+        &2592000,
+    );
+
+    let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
+    env.mock_all_auths();
+    stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
+    client.fund(&client_addr, &30_000_000_000i128);
+
+    // Request mediation
+    client.request_mediation(&client_addr);
+    assert_eq!(client.get_status(), EscrowStatus::Disputed);
+
+    // Mediator resolves the dispute
+    let f_payout = 10_000_000_000i128;
+    let c_refund = 5_000_000_000i128;
+    
+    client.resolve_dispute(&mediator, &f_payout, &c_refund);
+
+    // Verify correct split
+    assert_eq!(client.get_status(), EscrowStatus::Settled);
+    let token_client = token::Client::new(&env, &token);
+    assert_eq!(token_client.balance(&freelancer), 10_000_000_000i128);
+    assert_eq!(token_client.balance(&client_addr), 30_000_000_000i128); // 40B - 15B + 5B
+    assert_eq!(client.get_locked_balance(), 0i128);
+}

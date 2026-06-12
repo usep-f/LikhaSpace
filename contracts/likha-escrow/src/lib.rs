@@ -33,6 +33,7 @@ pub enum EscrowStatus {
     Completed = 2,
     Disputed = 3,
     Cancelled = 4,
+    Settled = 5,
 }
 
 #[contracttype]
@@ -448,6 +449,34 @@ impl LikhaEscrow {
 
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+    }
+
+    pub fn resolve_dispute(
+        env: Env,
+        mediator: Address,
+        freelancer_payout: i128,
+        client_refund: i128,
+    ) {
+        let config = get_config(&env);
+        assert_eq!(mediator, config.mediator, "Only mediator");
+        mediator.require_auth();
+        check_status(&env, EscrowStatus::Disputed);
+
+        let locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
+        assert_eq!(freelancer_payout + client_refund, locked_xlm, "Must distribute exact locked balance");
+
+        let token_client = token::Client::new(&env, &config.token);
+
+        if freelancer_payout > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.freelancer, &freelancer_payout);
+        }
+        if client_refund > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.client, &client_refund);
+        }
+
+        env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Settled);
+        set_interaction(&env);
     }
 
     pub fn get_dispute_proposal(env: Env) -> Option<DisputeProposal> {

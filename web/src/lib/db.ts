@@ -81,3 +81,10 @@ export function subscribeToFreelancerOrders(freelancerAddress: string, callback:
     callback(snap.docs.map(d => d.data() as Order));
   });
 }
+
+export function subscribeToMediatorOrders(callback: (orders: Order[]) => void) {
+  const q = query(collection(db, 'orders'), where('status', 'in', ['disputed', 'settled_dispute']));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => d.data() as Order));
+  });
+}

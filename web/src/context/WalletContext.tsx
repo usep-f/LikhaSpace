@@ -5,7 +5,7 @@ import { doc, getDoc, setDoc, deleteDoc, DocumentData } from 'firebase/firestore
 import { db } from '../lib/firebase';
 import { useNotification } from './NotificationContext';
 
-export type UserRole = 'artist' | 'client';
+export type UserRole = 'artist' | 'client' | 'mediator';
 
 export interface UserProfile {
   name: string;
