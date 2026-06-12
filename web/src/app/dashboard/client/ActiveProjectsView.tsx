@@ -14,6 +14,23 @@ import { subscribeToClientOrders, updateOrderStatus, getGig } from '@/lib/db';
 import { deployAndInitializeEscrow, fundEscrow, getRequiredXlmForGig, getOraclePrice } from '@/lib/contract';
 import { getXlmBalance } from '@/lib/stellar';
 
+function getStatusBadge(order: Order) {
+  if (order.status === 'pending_acceptance') return { text: 'Pending Acceptance', classes: 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' };
+  if (order.status === 'awaiting_funding') return { text: 'Awaiting Funding', classes: 'bg-[#331133]/80 text-[#ff00ff] border border-[#ff00ff]/30 shadow-[0_0_8px_rgba(255,0,255,0.15)]' };
+  if (order.status === 'delivered') return { text: 'Delivered', classes: 'bg-[#001a00]/80 text-[#39ff14] border border-[#39ff14]/30 shadow-[0_0_8px_rgba(57,255,20,0.15)]' };
+  
+  if (order.status === 'escrow_funded') {
+    if (order.denialMessage) {
+      return { text: 'Up For Revision', classes: 'bg-[#330000]/80 text-[#ff3333] border border-[#ff3333]/30 shadow-[0_0_8px_rgba(255,51,51,0.15)]' };
+    }
+    if (order.currentMilestoneIdx && order.currentMilestoneIdx > 0) {
+      return { text: `Milestone ${order.currentMilestoneIdx + 1} Active`, classes: 'bg-[#001a1a]/80 text-[#00ffff] border border-[#00ffff]/30 shadow-[0_0_8px_rgba(0,255,255,0.15)]' };
+    }
+    return { text: 'Escrow Funded', classes: 'bg-[#001a1a]/80 text-[#00ffff] border border-[#00ffff]/30 shadow-[0_0_8px_rgba(0,255,255,0.15)]' };
+  }
+  return { text: order.status.replace('_', ' '), classes: 'bg-white/10 text-white border border-white/20' };
+}
+
 function getMilestonesConfig(order: Order) {
   if (order.milestones && order.milestones.length > 0) {
     return order.milestones.map(m => ({
@@ -254,10 +271,9 @@ export const ActiveProjectsView: React.FC = () => {
 
   const statusOptions = [
     { label: 'All Statuses', value: 'all' },
-    { label: 'Pending Acceptance', value: 'pending_acceptance' },
-    { label: 'Escrow Funded', value: 'escrow_funded' },
-    { label: 'Delivered', value: 'delivered' },
-    { label: 'Disputed', value: 'disputed' }
+    { label: 'Pending Approval', value: 'pending_acceptance' },
+    { label: 'Pending Escrow', value: 'awaiting_funding' },
+    { label: 'Active Escrow', value: 'escrow_funded' }
   ];
 
   return (
@@ -277,16 +293,23 @@ export const ActiveProjectsView: React.FC = () => {
 
       {paginatedOrders.length > 0 ? (
         paginatedOrders.map(order => (
-          <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col lg:flex-row justify-between items-start gap-6">
-            <div className="flex-1 space-y-4 w-full pt-1">
-              <div>
-                 <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-1">Freelancer</p>
-                 <p className="text-sm font-bold text-white flex items-center gap-1">
-                   {order.gigInfo?.freelancerName || order.freelancerAddress} <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
-                 </p>
-                 <p className="text-xs text-gray-400 mt-1">{order.gigInfo?.title}</p>
+          <div key={order.id} className={`p-6 rounded-xl glass-card border flex flex-col md:flex-row justify-between items-center gap-6 ${
+            order.status === 'pending_acceptance' ? 'border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'border-white/5'
+          }`}>
+            <div className="flex-1 w-full">
+              <div className="flex items-center gap-3 mb-1">
+                <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                  order.status === 'pending_acceptance' ? 'text-neoncyan' : 'text-gray-400'
+                }`}>
+                  {order.status === 'pending_acceptance' ? 'Pending Acceptance' : 'Active Booking'}
+                </p>
               </div>
-              <div className="bg-obsidian rounded-lg p-4 border border-white/5 max-w-sm">
+              <p className="text-sm font-bold text-white flex items-center gap-1 mb-1">
+                Freelancer: {order.gigInfo?.freelancerName || order.freelancerAddress} <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
+              </p>
+              <p className="text-xs text-gray-400 mt-1">{order.gigInfo?.title}</p>
+              
+              <div className="bg-obsidian rounded-lg p-4 border border-white/5 max-w-sm mt-3">
                 <div className="flex justify-between text-xs mb-2">
                   <span className="text-gray-400">Total Budget:</span>
                   <span className="font-bold text-white">${order.priceUSD} USD</span>
@@ -297,50 +320,50 @@ export const ActiveProjectsView: React.FC = () => {
                 </div>
               </div>
               {order.status === 'pending_acceptance' && (
-                <p className="text-xs text-yellow-500 italic">Waiting for freelancer to accept request. Escrow funding will unlock upon acceptance.</p>
+                <p className="text-xs text-yellow-500 italic mt-2">Waiting for freelancer to accept request. Escrow funding will unlock upon acceptance.</p>
               )}
             </div>
 
-            <div className="flex flex-col gap-3 w-full lg:w-64">
-              <div className="mb-1 flex justify-start w-full">
-                <span className={`w-full text-center py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider font-heading ${
-                  order.status === 'pending_acceptance' ? 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' :
-                  order.status === 'awaiting_funding' ? 'bg-[#331133]/80 text-[#ff00ff] border border-[#ff00ff]/30 shadow-[0_0_8px_rgba(255,0,255,0.15)]' :
-                  order.status === 'escrow_funded' ? 'bg-[#001a1a]/80 text-[#00ffff] border border-[#00ffff]/30 shadow-[0_0_8px_rgba(0,255,255,0.15)]' :
-                  order.status === 'delivered' ? 'bg-[#001a00]/80 text-[#39ff14] border border-[#39ff14]/30 shadow-[0_0_8px_rgba(57,255,20,0.15)]' :
-                  'bg-white/10 text-white'
-                }`}>
-                  {order.status.replace('_', ' ')}
+            <div className="flex-1 w-full flex flex-col justify-end items-end gap-2">
+              <div className="mb-1">
+                <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider font-heading ${getStatusBadge(order).classes}`}>
+                  {getStatusBadge(order).text}
                 </span>
               </div>
 
-              {order.status === 'awaiting_funding' && (
-                <button
-                  onClick={() => handleFundEscrow(order)}
-                  className="w-full py-2.5 rounded-lg bg-[#ff00ff]/20 border border-[#ff00ff] text-[#ff00ff] font-heading font-bold text-xs uppercase hover:bg-[#ff00ff]/40 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
-                >
-                  <Activity className="w-4 h-4" /> Fund Escrow
-                </button>
-              )}
+              <div className="flex gap-2 flex-wrap justify-end">
+                {order.status === 'awaiting_funding' && (
+                  <button
+                    title="Fund Escrow"
+                    onClick={() => handleFundEscrow(order)}
+                    className="p-2.5 rounded bg-[#ff00ff]/20 border border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
+                  >
+                    <Activity className="w-5 h-5" />
+                  </button>
+                )}
 
-              <button
-                onClick={() => setActiveChatOrder(order)}
-                className="w-full py-2.5 rounded-lg bg-[#141026] border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/5 transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <MessageSquare className="w-4 h-4" /> Message
-              </button>
-              <button
-                onClick={() => setActiveDeliverablesOrder(order)}
-                className="w-full py-2.5 rounded-lg bg-[#001a1a]/40 border border-[#00ffff]/30 text-[#00ffff] font-heading font-bold text-xs uppercase hover:bg-[#001a1a]/60 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <ExternalLink className="w-4 h-4" /> View Deliverables
-              </button>
-              <button
-                onClick={() => setActiveStatusOrder(order)}
-                className="w-full py-2.5 rounded-lg bg-white text-black font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Activity className="w-4 h-4" /> View Status
-              </button>
+                <button
+                  title="Message"
+                  onClick={() => setActiveChatOrder(order)}
+                  className="p-2.5 rounded bg-[#141026] border border-white/10 text-white hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                </button>
+                <button
+                  title="View Deliverables"
+                  onClick={() => setActiveDeliverablesOrder(order)}
+                  className="p-2.5 rounded bg-[#001a1a]/40 border border-[#00ffff]/30 text-[#00ffff] hover:bg-[#001a1a]/60 transition-all cursor-pointer"
+                >
+                  <ExternalLink className="w-5 h-5" />
+                </button>
+                <button
+                  title="View Status"
+                  onClick={() => setActiveStatusOrder(order)}
+                  className="p-2.5 rounded bg-white text-black hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
+                >
+                  <Activity className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         ))

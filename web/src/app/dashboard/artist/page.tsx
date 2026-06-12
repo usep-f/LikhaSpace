@@ -14,6 +14,23 @@ import { ChatModal } from '@/components/ChatModal';
 import { StatusModal } from '@/components/StatusModal';
 import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 
+function getStatusBadge(order: Order) {
+  if (order.status === 'pending_acceptance') return { text: 'Pending Acceptance', classes: 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' };
+  if (order.status === 'awaiting_funding') return { text: 'Awaiting Funding', classes: 'bg-[#331133]/80 text-[#ff00ff] border border-[#ff00ff]/30 shadow-[0_0_8px_rgba(255,0,255,0.15)]' };
+  if (order.status === 'delivered') return { text: 'Delivered', classes: 'bg-[#001a00]/80 text-[#39ff14] border border-[#39ff14]/30 shadow-[0_0_8px_rgba(57,255,20,0.15)]' };
+  
+  if (order.status === 'escrow_funded') {
+    if (order.denialMessage) {
+      return { text: 'Up For Revision', classes: 'bg-[#330000]/80 text-[#ff3333] border border-[#ff3333]/30 shadow-[0_0_8px_rgba(255,51,51,0.15)]' };
+    }
+    if (order.currentMilestoneIdx && order.currentMilestoneIdx > 0) {
+      return { text: `Milestone ${order.currentMilestoneIdx + 1} Active`, classes: 'bg-[#001a1a]/80 text-[#00ffff] border border-[#00ffff]/30 shadow-[0_0_8px_rgba(0,255,255,0.15)]' };
+    }
+    return { text: 'Escrow Funded', classes: 'bg-[#001a1a]/80 text-[#00ffff] border border-[#00ffff]/30 shadow-[0_0_8px_rgba(0,255,255,0.15)]' };
+  }
+  return { text: order.status.replace('_', ' '), classes: 'bg-white/10 text-white border border-white/20' };
+}
+
 // Sub-component: Stats
 const ReputationStatCard: React.FC<{ label: string; value: string; colorClass: string }> = ({ label, value, colorClass }) => (
   <div className="p-4 rounded-xl glass-card border border-white/5">
@@ -257,10 +274,9 @@ const OrdersView: React.FC = () => {
 
   const statusOptions = [
     { label: 'All Orders', value: 'all' },
-    { label: 'Pending Acceptance', value: 'pending_acceptance' },
-    { label: 'Escrow Funded (Active)', value: 'escrow_funded' },
-    { label: 'Delivered', value: 'delivered' },
-    { label: 'Completed', value: 'completed' }
+    { label: 'Pending Approval', value: 'pending_acceptance' },
+    { label: 'Pending Escrow', value: 'awaiting_funding' },
+    { label: 'Active Escrow', value: 'escrow_funded' }
   ];
 
   return (
@@ -289,39 +305,44 @@ const OrdersView: React.FC = () => {
                    }`}>
                      {order.status === 'pending_acceptance' ? 'New Request' : 'Active Order'}
                    </p>
-                   <span className="px-2 py-0.5 rounded bg-white/10 text-white text-[9px] uppercase tracking-wider font-bold">
-                     {order.status.replace('_', ' ')}
-                   </span>
                  </div>
                  <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
                  <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} • Upfront: {order.upfrontPercentage}%</p>
                </div>
 
-               <div className="flex-1 w-full flex justify-end">
+               <div className="flex-1 w-full flex flex-col justify-end items-end gap-2">
+                 <div className="mb-1">
+                   <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider font-heading ${getStatusBadge(order).classes}`}>
+                     {getStatusBadge(order).text}
+                   </span>
+                 </div>
                  {order.status === 'pending_acceptance' ? (
                    !showDenyInput[order.id] ? (
                      <div className="flex gap-2 flex-wrap justify-end">
                        <button
+                         title="View Proposal"
                          onClick={() => setActiveProposalOrder(order)}
-                         className="px-4 py-2 rounded bg-neoncyan/10 border border-neoncyan/30 text-neoncyan font-heading font-bold text-xs uppercase hover:bg-neoncyan/20 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                         className="p-2.5 rounded bg-neoncyan/10 border border-neoncyan/30 text-neoncyan hover:bg-neoncyan/20 transition-all cursor-pointer"
                        >
-                         <Eye className="w-4 h-4" /> View Proposal
+                         <Eye className="w-5 h-5" />
                        </button>
                        <button
+                         title="Accept Request"
                          onClick={() => handleAcceptBooking(order.id)}
-                         className="px-4 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                         className="p-2.5 rounded bg-neongreen text-obsidian hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all cursor-pointer"
                        >
-                         <Check className="w-4 h-4" /> Accept
+                         <Check className="w-5 h-5" />
                        </button>
                        <button
+                         title="Deny Request"
                          onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: true })}
-                         className="px-4 py-2 rounded bg-white/5 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                         className="p-2.5 rounded bg-white/5 text-white hover:bg-white/10 transition-colors cursor-pointer"
                        >
-                         <X className="w-4 h-4" /> Deny
+                         <X className="w-5 h-5" />
                        </button>
                      </div>
                    ) : (
-                     <div className="w-full space-y-2">
+                     <div className="w-full space-y-2 max-w-xs">
                        <textarea
                          value={denyMsgs[order.id] || ''}
                          onChange={(e) => setDenyMsgs({ ...denyMsgs, [order.id]: e.target.value })}
@@ -338,23 +359,26 @@ const OrdersView: React.FC = () => {
                    <div className="flex gap-2">
                      {order.status === 'escrow_funded' && (
                        <button
+                         title="Submit Deliverables"
                          onClick={() => setActiveSubmitOrder(order)}
-                         className="px-4 py-2 rounded bg-neoncyan border border-neoncyan/30 text-obsidian font-heading font-bold text-xs uppercase hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)] flex items-center gap-1"
+                         className="p-2.5 rounded bg-neoncyan border border-neoncyan/30 text-obsidian hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)]"
                        >
-                         <UploadCloud className="w-4 h-4" /> Submit Deliverables
+                         <UploadCloud className="w-5 h-5" />
                        </button>
                      )}
                      <button
+                       title="Message"
                        onClick={() => setActiveChatOrder(order)}
-                       className="px-4 py-2 rounded bg-[#141026] border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/5 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                       className="p-2.5 rounded bg-[#141026] border border-white/10 text-white hover:bg-white/5 transition-colors cursor-pointer"
                      >
-                       <MessageSquare className="w-4 h-4" /> Message
+                       <MessageSquare className="w-5 h-5" />
                      </button>
                      <button
+                       title="View Status"
                        onClick={() => setActiveStatusOrder(order)}
-                       className="px-4 py-2 rounded bg-white text-black font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                       className="p-2.5 rounded bg-white text-black hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
                      >
-                       <Activity className="w-4 h-4" /> View Status
+                       <Activity className="w-5 h-5" />
                      </button>
                    </div>
                  )}
