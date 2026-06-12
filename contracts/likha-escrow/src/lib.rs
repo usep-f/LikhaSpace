@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, Symbol, Vec,
+    contract, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol, Vec,
 };
 
 #[contracttype]
@@ -59,6 +59,32 @@ pub enum DataKey {
     LastInteractionTimestamp,
     LockedXlmBalance, // Stroops locked
     StroopsPerCent, // Stored oracle conversion rate at funding
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Asset {
+    Stellar(Address),
+    Other(Symbol),
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PriceFeed {
+    pub price: i128,
+    pub timestamp: u64,
+}
+
+fn get_stroops_per_cent(env: &Env, oracle: &Address) -> i128 {
+    let decimals: u32 = env.invoke_contract(oracle, &Symbol::new(env, "decimals"), soroban_sdk::vec![env]);
+    let price_feed_opt: Option<PriceFeed> = env.invoke_contract(
+        oracle,
+        &Symbol::new(env, "lastprice"),
+        soroban_sdk::vec![env, Asset::Other(Symbol::new(env, "XLM")).into_val(env)],
+    );
+    let price_feed = price_feed_opt.unwrap();
+    let scale = 10i128.pow(decimals + 5);
+    scale / price_feed.price
 }
 
 #[contract]
@@ -130,7 +156,7 @@ impl LikhaEscrow {
         let total_usd = config.upfront_amount_usd + total_milestone_usd;
 
         // Oracle returns how many XLM stroops equals 1 USD cent.
-        let stroops_per_cent: i128 = env.invoke_contract(&config.oracle, &Symbol::new(&env, "get_price"), soroban_sdk::vec![&env]);
+        let stroops_per_cent: i128 = get_stroops_per_cent(&env, &config.oracle);
         let total_xlm_required = total_usd * stroops_per_cent;
         
         assert!(total_xlm_required <= max_xlm_to_spend, "Slippage exceeded max XLM");
@@ -254,7 +280,7 @@ impl LikhaEscrow {
         client.require_auth();
         check_status(&env, EscrowStatus::Funded);
 
-        let stroops_per_cent: i128 = env.invoke_contract(&config.oracle, &Symbol::new(&env, "get_price"), soroban_sdk::vec![&env]);
+        let stroops_per_cent: i128 = get_stroops_per_cent(&env, &config.oracle);
         let revision_xlm = config.paid_revision_price_usd * stroops_per_cent;
         assert!(revision_xlm <= max_xlm_to_spend, "Slippage exceeded");
 

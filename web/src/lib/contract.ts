@@ -25,13 +25,42 @@ export async function getOraclePrice(): Promise<number> {
   try {
     const dummyAccount = 'GAFBCLO24QMPVXFZJHVLRG6CKAGBJEMCW57UG45SS7PQ2LGMZTGY7DGX';
     const account = await server.getAccount(dummyAccount);
-    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
-      .addOperation(new Contract(ORACLE_ID).call('get_price'))
-      .setTimeout(30)
-      .build();
-    const sim = await server.simulateTransaction(tx);
-    if (rpc.Api.isSimulationSuccess(sim) && sim.result) {
-      return Number(scValToBigInt(sim.result.retval));
+
+    let decimals = 14;
+    const txDec = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
+      .addOperation(new Contract(ORACLE_ID).call('decimals'))
+      .setTimeout(30).build();
+    const simDec = await server.simulateTransaction(txDec);
+    if (rpc.Api.isSimulationSuccess(simDec) && simDec.result) {
+      decimals = Number(scValToBigInt(simDec.result.retval));
+    }
+
+    const assetScVal = xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('Other'), xdr.ScVal.scvSymbol('XLM')]);
+    const txPrice = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
+      .addOperation(new Contract(ORACLE_ID).call('lastprice', assetScVal))
+      .setTimeout(30).build();
+    const simPrice = await server.simulateTransaction(txPrice);
+    
+    if (rpc.Api.isSimulationSuccess(simPrice) && simPrice.result) {
+      const val = simPrice.result.retval;
+      if (val.switch() === xdr.ScValType.scvMap()) {
+        const map = val.map();
+        if (map) {
+          for (const entry of map) {
+            const key = entry.key();
+            if (key.switch() === xdr.ScValType.scvSymbol()) {
+              const symStr = key.sym().toString();
+              if (symStr === 'price' || symStr.includes('price')) {
+                const price = scValToBigInt(entry.val());
+                if (price > BigInt(0)) {
+                  const scale = BigInt(10) ** BigInt(decimals + 5);
+                  return Number(scale / price);
+                }
+              }
+            }
+          }
+        }
+      }
     }
   } catch (e) {
     console.error('Failed to fetch oracle price:', e);
