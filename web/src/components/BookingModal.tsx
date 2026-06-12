@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Gig } from '@/lib/mockGigs';
 import { X, ShieldAlert, ArrowRight } from 'lucide-react';
+import { PriceDisplay } from '@/components/ui/PriceDisplay';
 
 interface BookingModalProps {
   gig: Gig;
@@ -33,11 +34,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ gig, onClose, onConf
           <p className="text-sm font-bold text-white mb-2">{gig.title}</p>
           <div className="flex justify-between items-center text-xs border-t border-white/5 pt-3 mt-3">
             <span className="text-gray-400">Total Budget</span>
-            <span className="font-bold text-white">${gig.priceUSD} USD</span>
+            <PriceDisplay amountUsd={gig.priceUSD} usdClassName="font-bold text-white" />
           </div>
           <div className="flex justify-between items-center text-xs mt-2 pb-2">
             <span className="text-gray-400">Required Upfront ({gig.upfrontPercentage}%)</span>
-            <span className="font-bold text-neongreen">${(gig.priceUSD * (gig.upfrontPercentage / 100)).toFixed(2)} USD</span>
+            <PriceDisplay amountUsd={gig.priceUSD * (gig.upfrontPercentage / 100)} usdClassName="font-bold text-neongreen" />
           </div>
           {gig.milestones && gig.milestones.length > 0 ? (
             <div className="border-t border-white/5 pt-2 mt-2 space-y-2">
@@ -45,7 +46,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ gig, onClose, onConf
               {gig.milestones.map((m, idx) => (
                 <div key={idx} className="flex justify-between items-center text-xs">
                   <span className="text-gray-400 truncate pr-4">{idx + 1}. {m.title}</span>
-                  <span className="font-bold text-white whitespace-nowrap">${m.payoutUSD.toFixed(2)} USD</span>
+                  <PriceDisplay amountUsd={m.payoutUSD} usdClassName="font-bold text-white whitespace-nowrap" />
                 </div>
               ))}
             </div>
@@ -53,7 +54,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ gig, onClose, onConf
             <div className="border-t border-white/5 pt-2 mt-2">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-gray-400">Final Milestone</span>
-                <span className="font-bold text-white">${(gig.priceUSD - (gig.priceUSD * (gig.upfrontPercentage / 100))).toFixed(2)} USD</span>
+                <PriceDisplay amountUsd={gig.priceUSD - (gig.priceUSD * (gig.upfrontPercentage / 100))} usdClassName="font-bold text-white" />
               </div>
             </div>
           )}

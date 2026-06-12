@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
-import { Sparkles, PlusCircle, Check, X, Eye, MessageSquare, Activity, UploadCloud } from 'lucide-react';
+import { Sparkles, PlusCircle } from 'lucide-react';
 import { Order, Gig, FreelancerProfile } from '@/lib/mockGigs';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
@@ -13,6 +13,7 @@ import { ListingModal } from '@/components/ListingModal';
 import { ChatModal } from '@/components/ChatModal';
 import { StatusModal } from '@/components/StatusModal';
 import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
+import { ProjectCard } from '@/components/ProjectCard';
 
 // Sub-component: Stats
 const ReputationStatCard: React.FC<{ label: string; value: string; colorClass: string }> = ({ label, value, colorClass }) => (
@@ -251,10 +252,6 @@ const OrdersView: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
-  // Active decline interaction state mapping (orderId -> boolean)
-  const [showDenyInput, setShowDenyInput] = useState<Record<string, boolean>>({});
-  const [denyMsgs, setDenyMsgs] = useState<Record<string, string>>({});
-
   // Modal State
   const [activeProposalOrder, setActiveProposalOrder] = useState<Order | null>(null);
   const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
@@ -262,9 +259,12 @@ const OrdersView: React.FC = () => {
   const [activeSubmitOrder, setActiveSubmitOrder] = useState<Order | null>(null);
 
   const filteredOrders = myOrders.filter(order => {
-    if (order.status === 'completed') return false;
+    if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'denied') return false;
     const matchesSearch = order.clientName.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'all' ||
+      order.status === statusFilter ||
+      (statusFilter === 'escrow_funded' && (order.status === 'delivered' || order.status === 'disputed'));
     return matchesSearch && matchesStatus;
   });
 
@@ -276,6 +276,17 @@ const OrdersView: React.FC = () => {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast(`Error accepting booking: ${msg}`, 'error');
+    }
+  };
+
+  const handleConfirmDecline = async (orderId: string, reason: string) => {
+    showToast('Declining request...', 'info');
+    try {
+      await updateOrderStatus(orderId, { status: 'denied', denialMessage: reason });
+      showToast('Request declined successfully', 'success');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Error declining request: ${msg}`, 'error');
     }
   };
 
@@ -305,10 +316,10 @@ const OrdersView: React.FC = () => {
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const statusOptions = [
-    { label: 'All Orders', value: 'all' },
+    { label: 'All', value: 'all' },
     { label: 'Pending Acceptance', value: 'pending_acceptance' },
-    { label: 'Escrow Funded (Active)', value: 'escrow_funded' },
-    { label: 'Delivered', value: 'delivered' }
+    { label: 'Pending Escrow', value: 'awaiting_funding' },
+    { label: 'Escrow Funded (Active)', value: 'escrow_funded' }
   ];
 
   return (
@@ -327,95 +338,18 @@ const OrdersView: React.FC = () => {
       <div className="space-y-4">
         {paginatedOrders.length > 0 ? (
           paginatedOrders.map(order => (
-            <div key={order.id} className={`p-6 rounded-xl glass-card border flex flex-col md:flex-row justify-between items-center gap-6 ${
-              order.status === 'pending_acceptance' ? 'border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'border-white/5'
-            }`}>
-               <div className="flex-1 w-full">
-                 <div className="flex items-center gap-3 mb-1">
-                   <p className={`text-[10px] uppercase font-bold tracking-wider ${
-                     order.status === 'pending_acceptance' ? 'text-neoncyan' : 'text-gray-400'
-                   }`}>
-                     {order.status === 'pending_acceptance' ? 'New Request' : 'Active Order'}
-                   </p>
-                   <span className="px-2 py-0.5 rounded bg-white/10 text-white text-[9px] uppercase tracking-wider font-bold">
-                     {order.status.replace('_', ' ')}
-                   </span>
-                 </div>
-                 <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
-                 <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} • Upfront: {order.upfrontPercentage}%</p>
-               </div>
-
-               <div className="flex-1 w-full flex justify-end">
-                 {order.status === 'pending_acceptance' ? (
-                   !showDenyInput[order.id] ? (
-                     <div className="flex gap-2 flex-wrap justify-end">
-                       <button
-                         onClick={() => setActiveProposalOrder(order)}
-                         className="px-4 py-2 rounded bg-neoncyan/10 border border-neoncyan/30 text-neoncyan font-heading font-bold text-xs uppercase hover:bg-neoncyan/20 transition-all flex items-center justify-center gap-1 cursor-pointer"
-                       >
-                         <Eye className="w-4 h-4" /> View Proposal
-                       </button>
-                       <button
-                         onClick={() => handleAcceptBooking(order.id)}
-                         className="px-4 py-2 rounded bg-neongreen text-obsidian font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer"
-                       >
-                         <Check className="w-4 h-4" /> Accept
-                       </button>
-                       <button
-                         onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: true })}
-                         className="px-4 py-2 rounded bg-white/5 text-white font-heading font-bold text-xs uppercase hover:bg-white/10 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                       >
-                         <X className="w-4 h-4" /> Deny
-                       </button>
-                     </div>
-                   ) : (
-                     <div className="w-full space-y-2">
-                       <textarea
-                         value={denyMsgs[order.id] || ''}
-                         onChange={(e) => setDenyMsgs({ ...denyMsgs, [order.id]: e.target.value })}
-                         placeholder="Reason for declining (Optional)..."
-                         className="w-full bg-obsidian border border-white/10 rounded-lg p-2 text-xs text-white resize-none h-16"
-                       />
-                       <div className="flex justify-end gap-2">
-                         <button onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: false })} className="px-3 py-1.5 rounded text-gray-400 text-xs hover:text-white cursor-pointer">Cancel</button>
-                         <button className="px-3 py-1.5 rounded bg-hotpink text-white font-bold text-xs cursor-pointer">Confirm Decline</button>
-                       </div>
-                     </div>
-                   )
-                 ) : (
-                   <div className="flex gap-2">
-                     {order.status === 'escrow_funded' && (
-                       <>
-                         <button
-                           onClick={() => setActiveSubmitOrder(order)}
-                           className="px-4 py-2 rounded bg-neoncyan border border-neoncyan/30 text-obsidian font-heading font-bold text-xs uppercase hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)] flex items-center gap-1"
-                         >
-                           <UploadCloud className="w-4 h-4" /> Submit Deliverables
-                         </button>
-                         <button
-                           onClick={() => handleCancelAndRefund(order)}
-                           className="px-4 py-2 rounded bg-red-500/10 border border-red-500/30 text-red-500 font-heading font-bold text-xs uppercase hover:bg-red-500/20 transition-all cursor-pointer flex items-center justify-center gap-1"
-                         >
-                           <X className="w-4 h-4" /> Refund Client
-                         </button>
-                       </>
-                     )}
-                     <button
-                       onClick={() => setActiveChatOrder(order)}
-                       className="px-4 py-2 rounded bg-[#141026] border border-white/10 text-white font-heading font-bold text-xs uppercase hover:bg-white/5 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                     >
-                       <MessageSquare className="w-4 h-4" /> Message
-                     </button>
-                     <button
-                       onClick={() => setActiveStatusOrder(order)}
-                       className="px-4 py-2 rounded bg-white text-black font-heading font-bold text-xs uppercase hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all flex items-center justify-center gap-1 cursor-pointer"
-                     >
-                       <Activity className="w-4 h-4" /> View Status
-                     </button>
-                   </div>
-                 )}
-               </div>
-            </div>
+            <ProjectCard
+              key={order.id}
+              order={order}
+              perspective="freelancer"
+              onViewProposal={setActiveProposalOrder}
+              onAcceptBooking={handleAcceptBooking}
+              onConfirmDecline={handleConfirmDecline}
+              onSubmitDeliverables={setActiveSubmitOrder}
+              onRefundClient={handleCancelAndRefund}
+              onMessage={setActiveChatOrder}
+              onViewStatus={setActiveStatusOrder}
+            />
           ))
         ) : (
           <div className="py-12 text-center border border-white/5 rounded-xl glass-card">
@@ -475,7 +409,7 @@ const HistoryView: React.FC = () => {
     if (!address) return;
     getFreelancerOrders(address)
       .then(orders => {
-        setCompletedOrders(orders.filter(o => o.status === 'completed' || o.status === 'cancelled'));
+        setCompletedOrders(orders.filter(o => o.status === 'completed' || o.status === 'cancelled' || o.status === 'denied'));
       })
       .catch(console.error);
   }, [address]);
@@ -489,8 +423,11 @@ const HistoryView: React.FC = () => {
             <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col gap-4">
                <div className="flex justify-between items-start">
                  <div>
-                   <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${order.status === 'cancelled' ? 'text-red-400' : 'text-green-400'}`}>
-                     {order.status === 'cancelled' ? 'Cancelled Order' : 'Completed Order'}
+                   <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${
+                     order.status === 'cancelled' || order.status === 'denied' ? 'text-red-400' : 'text-green-400'
+                   }`}>
+                     {order.status === 'cancelled' ? 'Cancelled Order' : 
+                      order.status === 'denied' ? 'Denied Request' : 'Completed Order'}
                    </p>
                    <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
                    <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>

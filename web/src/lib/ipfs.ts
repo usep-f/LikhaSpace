@@ -55,8 +55,20 @@ export async function fetchFromIPFS<T>(cid: string): Promise<T | null> {
         console.error('Failed to parse cached IPFS JSON:', e);
       }
     }
+
+    // Call the server API route to fetch from IPFS to avoid CORS in the browser
+    try {
+      const res = await fetch(`/api/ipfs?cid=${encodeURIComponent(cid)}`);
+      if (res.ok) {
+        return (await res.json()) as T;
+      }
+    } catch (err) {
+      console.error('Client failed to fetch via /api/ipfs route:', err);
+    }
+    return null;
   }
 
+  // Server-side direct fetching
   const gateways = [
     `https://cloudflare-ipfs.com/ipfs/${cid}`,
     `https://gateway.pinata.cloud/ipfs/${cid}`,

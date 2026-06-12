@@ -23,10 +23,10 @@ if ($keys -notmatch "\b$Identity\b") {
 Write-Host "Building contracts..."
 stellar contract build
 
-# 3. Deploy Reflector Mock Oracle to testnet
-Write-Host "Deploying Reflector Mock Oracle to $Network..."
-$OracleId = (stellar contract deploy --wasm $ReflectorWasm --source-account $Identity --network $Network).Trim()
-Write-Host "Deployed Oracle ID: $OracleId"
+# 3. Use Official Reflector Testnet Oracle (CEX/DEX feed)
+Write-Host "Using Official Reflector Testnet Oracle..."
+$OracleId = "CCYOZJCOPG34LLQQ7N24YXBM7LL62R7ONMZ3G6WZAAYPB5OYKOMJRN63"
+Write-Host "Oracle ID: $OracleId"
 
 # 4. Install Likha Escrow WASM to testnet
 Write-Host "Installing Likha Escrow WASM to $Network..."

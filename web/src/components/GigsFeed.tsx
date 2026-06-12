@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Gig } from '@/lib/mockGigs';
 import { Tag, HelpCircle, ArrowUpRight, Star, Search } from 'lucide-react';
 import { getAllGigs } from '@/lib/db';
+import { PriceDisplay } from '@/components/ui/PriceDisplay';
 
 // Sub-component: Status Badge
 const StatusBadge: React.FC<{ status: Gig['status'] }> = ({ status }) => {
@@ -75,12 +76,12 @@ const GigCard: React.FC<CardProps> = ({ gig,  onBookClick, onProfileClick }) => 
 
         <div className="flex items-center justify-between pt-2">
           <div>
-            <p className="text-sm font-bold text-white font-heading mt-0.5 flex items-center gap-2">
-              ${gig.priceUSD}
-              <span className="text-[10px] uppercase tracking-wider text-gray-500">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+              <PriceDisplay amountUsd={gig.priceUSD} usdClassName="text-sm font-bold text-white font-heading" xlmClassName="text-[10px] text-gray-400 font-normal ml-1" />
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 whitespace-nowrap">
                 ({gig.upfrontPercentage}% Upfront)
               </span>
-            </p>
+            </div>
           </div>
           <button
             disabled={gig.status === 'occupied'}

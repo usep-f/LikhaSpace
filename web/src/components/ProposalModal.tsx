@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Order, Gig } from '@/lib/mockGigs';
 import { X, User, Briefcase, FileText } from 'lucide-react';
 import { getGig } from '@/lib/db';
+import { PriceDisplay } from '@/components/ui/PriceDisplay';
 
 interface ProposalModalProps {
   order: Order;
@@ -48,7 +49,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({ order, onClose }) 
             <div>
               <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-0.5">Target Service</p>
               <p className="text-sm font-bold text-white">{gigInfo?.title || 'Unknown Service'}</p>
-              <p className="text-xs text-gray-400 mt-1">Total: <span className="font-bold text-white">${order.priceUSD}</span> • Upfront: <span className="font-bold text-neongreen">{order.upfrontPercentage}%</span></p>
+              <div className="text-xs text-gray-400 mt-1 flex items-center gap-1 flex-wrap">Total: <PriceDisplay amountUsd={order.priceUSD} usdClassName="font-bold text-white" /> • Upfront: <span className="font-bold text-neongreen">{order.upfrontPercentage}%</span></div>
             </div>
           </div>
 

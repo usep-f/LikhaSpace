@@ -52,7 +52,30 @@ export async function registerUserProfile(
 }
 
 export async function deleteUserProfile(address: string): Promise<void> {
-  await setProfileCID(address, '');
+  const currentProfile = await getUserProfile(address);
+  if (currentProfile) {
+    const sanitizedProfile: DecentralizedProfile = {
+      orders: currentProfile.orders || [],
+      gigs: currentProfile.gigs || [],
+      name: 'Deleted User',
+      email: '',
+      phone: '',
+      title: '',
+      bio: '',
+      category: '',
+      careerPath: '',
+      github: '',
+      linkedin: '',
+      twitter: '',
+      portfolio: '',
+      role: currentProfile.role,
+      updatedAt: new Date().toISOString(),
+    };
+    const cid = await uploadToIPFS(sanitizedProfile);
+    await setProfileCID(address, cid);
+  } else {
+    await setProfileCID(address, '');
+  }
 }
 
 export async function createGig(gig: Gig): Promise<void> {

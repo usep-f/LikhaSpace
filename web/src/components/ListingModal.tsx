@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Gig, MilestoneConfig } from '@/lib/mockGigs';
 import { X, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { PriceDisplay } from '@/components/ui/PriceDisplay';
 
 interface ListingModalProps {
   gig?: Gig | null; // Pass gig to edit, or null to create new
@@ -118,7 +119,7 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
 
             <div className="space-y-1">
               <label className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center justify-between">
-                <span>Price (USD)</span>
+                <span className="flex items-center gap-2">Price (USD) <PriceDisplay amountUsd={formData.priceUSD || 0} usdClassName="hidden" xlmClassName="text-[10px] text-neoncyan font-bold" /></span>
                 {isOccupied && <span className="text-yellow-500">Locked</span>}
               </label>
               <div className="relative">
@@ -185,7 +186,7 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
                       />
                     </div>
                     <div className="w-full md:w-32 space-y-1">
-                      <label className="text-[10px] uppercase text-gray-400">Payout ($)</label>
+                      <label className="text-[10px] uppercase text-gray-400 flex items-center gap-1">Payout ($) <PriceDisplay amountUsd={milestone.payoutUSD || 0} usdClassName="hidden" xlmClassName="text-[10px] text-neoncyan font-bold" /></label>
                       <input 
                         type="number"
                         value={milestone.payoutUSD || ''}
@@ -247,8 +248,8 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
               )}
 
               {formData.milestones.length > 0 && (
-                <div className={`mt-4 p-3 rounded-lg border text-sm font-bold flex items-center justify-between ${isMilestonesValid ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
-                  <span>Upfront: ${upfrontAmount.toFixed(2)} + Milestones: ${milestoneTotal.toFixed(2)}</span>
+                <div className={`mt-4 p-3 rounded-lg border text-sm font-bold flex flex-col md:flex-row md:items-center justify-between gap-2 ${isMilestonesValid ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                  <span>Upfront: <PriceDisplay amountUsd={upfrontAmount} usdClassName="font-bold" xlmClassName="text-[10px] opacity-70 ml-1" /> + Milestones: <PriceDisplay amountUsd={milestoneTotal} usdClassName="font-bold" xlmClassName="text-[10px] opacity-70 ml-1" /></span>
                   <span>Sum: ${totalAllocated.toFixed(2)} / ${formData.priceUSD.toFixed(2)} {isMilestonesValid ? '(Correct!)' : '(Mismatch)'}</span>
                 </div>
               )}

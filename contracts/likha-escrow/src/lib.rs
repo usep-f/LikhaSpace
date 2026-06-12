@@ -20,6 +20,13 @@ pub struct PriceFeedEntry {
 
 fn get_stroops_per_cent(env: &Env, oracle: &Address) -> i128 {
     let asset = ReflectorAsset::Other(soroban_sdk::Symbol::new(env, "XLM"));
+    
+    let decimals: u32 = env.invoke_contract(
+        oracle,
+        &soroban_sdk::Symbol::new(env, "decimals"),
+        soroban_sdk::vec![env]
+    );
+
     let price_entry: Option<PriceFeedEntry> = env.invoke_contract(
         oracle,
         &soroban_sdk::Symbol::new(env, "lastprice"),
@@ -32,9 +39,9 @@ fn get_stroops_per_cent(env: &Env, oracle: &Address) -> i128 {
     };
     
     assert!(price > 0, "Oracle returned invalid price");
-    // Reflector returns price with 8 decimals.
-    // 1 USD cent = 10^13 / price in stroops.
-    10_000_000_000_000i128 / price
+    // Dynamically calculate factor based on oracle decimals: 10^(5 + decimals)
+    let factor = 10i128.pow(5 + decimals);
+    factor / price
 }
 
 #[contracttype]

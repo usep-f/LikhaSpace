@@ -52,7 +52,9 @@ export async function getOraclePrice(): Promise<number> {
     if (rpc.Api.isSimulationSuccess(sim) && sim.result && sim.result.retval) {
       const priceVal = parsePriceFeedEntry(sim.result.retval);
       if (priceVal && priceVal > BigInt(0)) {
-        return Number(BigInt("10000000000000") / priceVal);
+        const decimals = ORACLE_ID === 'CCYOZJCOPG34LLQQ7N24YXBM7LL62R7ONMZ3G6WZAAYPB5OYKOMJRN63' || ORACLE_ID === 'CAVLP5DH2GJPZMVO7IJY4CVOD5MWEFTJFVPD2YY2FQXOQHRGHK4D6HLP' ? 14 : 8;
+        const factor = BigInt(10) ** BigInt(5 + decimals);
+        return Number(factor / priceVal);
       }
     }
   } catch (e) {

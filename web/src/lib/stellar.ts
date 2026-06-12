@@ -40,9 +40,10 @@ export async function fundWithFriendbot(address: string): Promise<boolean> {
  * Helper to get the current connected wallet address via Freighter.
  */
 export async function getConnectedAddress(): Promise<string | null> {
-  if (await Freighter.isConnected()) {
+  const status = await Freighter.isConnected();
+  if (status && status.isConnected) {
     const pubKey = await Freighter.getAddress();
-    if (pubKey.address) {
+    if (pubKey && pubKey.address) {
       return pubKey.address;
     }
   }

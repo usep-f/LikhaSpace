@@ -25,6 +25,10 @@ impl ReflectorMock {
         10_000
     }
 
+    pub fn decimals(_env: Env) -> u32 {
+        8
+    }
+
     /// SEP-40 compliant method matching the real Reflector oracle.
     /// Returns the price with 8 decimals.
     /// 1 XLM = $0.10 USD, so price = 10,000,000 (0.10 * 10^8).

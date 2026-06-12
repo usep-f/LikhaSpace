@@ -1,6 +1,7 @@
 import React from 'react';
 import { Order } from '@/lib/mockGigs';
 import { X, CheckCircle, Circle, ArrowRightCircle } from 'lucide-react';
+import { PriceDisplay } from '@/components/ui/PriceDisplay';
 
 interface StatusModalProps {
   order: Order;
@@ -94,7 +95,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ order, onClose }) => {
                           <p className={`text-sm font-bold ${textColor}`}>{milestone.title}</p>
                           <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 ${iconColor}`}>{statusText}</span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Payout: ${milestone.payoutUSD} USD</p>
+                        <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">Payout: <PriceDisplay amountUsd={milestone.payoutUSD} usdClassName="font-normal" xlmClassName="text-[10px] text-gray-500 ml-1" /></div>
                         {milestone.state !== 'locked' && (
                           <p className="text-[10px] text-gray-500 mt-1">Revisions used: {milestone.revisionsUsed || 0} / {milestone.maxRevisions}</p>
                         )}

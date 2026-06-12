@@ -7,6 +7,7 @@ import { getDisputedOrders, updateOrderStatus } from '@/lib/db';
 import { resolveDispute } from '@/lib/contract';
 import { useNotification } from '@/context/NotificationContext';
 import { Order } from '@/lib/mockGigs';
+import { PriceDisplay } from '@/components/ui/PriceDisplay';
 
 const DisputedCaseCard: React.FC<{ order: Order; onResolved: () => void }> = ({ order, onResolved }) => {
   const [split, setSplit] = useState<number>(50);
@@ -53,7 +54,7 @@ const DisputedCaseCard: React.FC<{ order: Order; onResolved: () => void }> = ({ 
           <div className="bg-white/5 p-3 rounded-lg text-xs space-y-1 text-gray-400">
             <p><strong>Freelancer:</strong> {order.freelancerAddress}</p>
             <p><strong>Client:</strong> {order.clientAddress}</p>
-            <p><strong>Total Budget:</strong> {order.priceUSD} USD</p>
+            <p className="flex items-center gap-1"><strong>Total Budget:</strong> <PriceDisplay amountUsd={order.priceUSD} usdClassName="font-normal" /></p>
           </div>
         </div>
 
@@ -73,8 +74,8 @@ const DisputedCaseCard: React.FC<{ order: Order; onResolved: () => void }> = ({ 
               className="w-full accent-neoncyan"
             />
             <div className="flex justify-between text-[10px] text-gray-400">
-              <span>Freelancer USD: ${(order.priceUSD * (split / 100)).toFixed(2)}</span>
-              <span>Client USD: ${(order.priceUSD * ((100 - split) / 100)).toFixed(2)}</span>
+              <span className="flex items-center gap-1">Freelancer: <PriceDisplay amountUsd={order.priceUSD * (split / 100)} usdClassName="font-normal" /></span>
+              <span className="flex items-center gap-1">Client: <PriceDisplay amountUsd={order.priceUSD * ((100 - split) / 100)} usdClassName="font-normal" /></span>
             </div>
           </div>
           <button onClick={handleResolve} className="w-full py-2 rounded bg-neoncyan text-obsidian font-heading font-bold text-xs uppercase tracking-wider hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)]">
