@@ -15,7 +15,7 @@ import { StepSuccess } from './onboarding/StepSuccess';
 export default function ProfileRegistrationModal() {
   const router = useRouter();
   const { address, isRegistered, isConnected, registerProfile, hasAttemptedLogin, selectRole, role } = useWallet();
-  const { showToast } = useNotification();
+  const { showToast, showLoading, hideLoading } = useNotification();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isStep2Valid, setIsStep2Valid] = useState(false);
@@ -45,6 +45,7 @@ export default function ProfileRegistrationModal() {
 
   const submitRegistration = async () => {
     try {
+      showLoading('Saving profile registration...');
       await registerProfile({
         name: formData.name,
         email: formData.email,
@@ -61,6 +62,8 @@ export default function ProfileRegistrationModal() {
       setCurrentStep(6);
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Registration failed', 'error');
+    } finally {
+      hideLoading();
     }
   };
 

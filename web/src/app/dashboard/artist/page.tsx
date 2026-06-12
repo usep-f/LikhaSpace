@@ -65,7 +65,7 @@ const DashboardTabs: React.FC<{ active: string; onTabChange: (v: string) => void
 const ListingsView: React.FC = () => {
   const { address } = useWallet();
   const [gigs, setGigs] = useState<Gig[]>([]);
-  const { showToast } = useNotification();
+  const { showToast, showLoading, hideLoading } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -119,8 +119,8 @@ const ListingsView: React.FC = () => {
 
   const handleSaveListing = async (updatedGig: Partial<Gig>) => {
     if (!address) return showToast('Wallet not connected', 'error');
-    showToast('Saving service listing...', 'info');
     try {
+      showLoading('Saving service listing...');
       const profile = await getUserProfile(address);
       const freelancerName = profile?.name || 'Freelancer';
 
@@ -146,6 +146,8 @@ const ListingsView: React.FC = () => {
       console.error(e);
       const msg = e instanceof Error ? e.message : String(e);
       showToast(`Failed to save listing: ${msg}`, 'error');
+    } finally {
+      hideLoading();
     }
   };
 
@@ -233,8 +235,7 @@ const OrdersView: React.FC = () => {
     });
     return () => unsubscribe();
   }, [address]);
-
-  const { showToast } = useNotification();
+  const { showToast, showLoading, hideLoading } = useNotification();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -259,13 +260,15 @@ const OrdersView: React.FC = () => {
   });
 
   const handleAcceptBooking = async (orderId: string) => {
-    showToast('Accepting booking request...', 'info');
     try {
+      showLoading('Accepting booking request...');
       await updateOrderStatus(orderId, { status: 'awaiting_funding' });
       showToast('Booking accepted! Waiting for client to fund the escrow.', 'success');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       showToast(`Error accepting booking: ${msg}`, 'error');
+    } finally {
+      hideLoading();
     }
   };
 
@@ -493,7 +496,7 @@ const HistoryView: React.FC = () => {
 // Profile Settings View
 const ProfileSettingsView: React.FC = () => {
   const { userProfile, registerProfile, deleteProfile } = useWallet();
-  const { showToast, showConfirm } = useNotification();
+  const { showToast, showConfirm, showLoading, hideLoading } = useNotification();
   const [formData, setFormData] = useState({
     name: userProfile?.name || '',
     email: userProfile?.email || '',
@@ -512,10 +515,17 @@ const ProfileSettingsView: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    void registerProfile(formData);
-    showToast('Profile updated successfully!', 'success');
+    try {
+      showLoading('Saving profile...');
+      await registerProfile(formData);
+      showToast('Profile updated successfully!', 'success');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      hideLoading();
+    }
   };
 
   const handleDelete = () => {
@@ -523,8 +533,13 @@ const ProfileSettingsView: React.FC = () => {
       'Delete Account',
       'Are you sure you want to completely delete your account? Your personal data will be erased, but your on-chain transactions will remain safely recorded on the Stellar network under your wallet address.',
       async () => {
-        await deleteProfile();
-        window.location.href = '/';
+        try {
+          showLoading('Deleting account...');
+          await deleteProfile();
+          window.location.href = '/';
+        } catch (e) {
+          hideLoading();
+        }
       }
     );
   };

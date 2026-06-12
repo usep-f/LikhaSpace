@@ -63,7 +63,7 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeDeliverablesOrder, setActiveDeliverablesOrder] = useState<Order | null>(null);
   const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
 
-  const { showToast } = useNotification();
+  const { showToast, showLoading, hideLoading } = useNotification();
 
   React.useEffect(() => {
     if (!address) return;
@@ -83,14 +83,15 @@ export const ActiveProjectsView: React.FC = () => {
     if (!address) return showToast('Wallet not connected', 'error');
     showToast('Checking wallet balance...', 'info');
     try {
+      showLoading('Funding Escrow via Freighter...');
       const hasBalance = await checkEscrowBalance(address, order.priceUSD);
       if (!hasBalance) {
         const requiredXlm = await getRequiredXlmForGig(order.priceUSD);
         const actualBal = await getXlmBalance(address);
         showToast(`Insufficient funds! Need ~${(requiredXlm + 5).toFixed(2)} XLM, but you only have ${actualBal.toFixed(2)} XLM.`, 'error');
+        hideLoading();
         return;
       }
-      showToast('Deploying & Funding Escrow...', 'info');
       const contractId = await deployAndInitializeEscrow(
         address,
         order.freelancerAddress,
@@ -98,7 +99,6 @@ export const ActiveProjectsView: React.FC = () => {
         1000,
         getMilestonesConfig(order)
       );
-      showToast('Contract Deployed! Proceeding to fund...', 'info');
       const stroopsPerCent = await getOraclePrice();
       const totalXlmRequired = (BigInt(order.priceUSD * 100) * BigInt(stroopsPerCent)).toString();
       await fundEscrow(contractId, address, totalXlmRequired);
@@ -126,14 +126,16 @@ export const ActiveProjectsView: React.FC = () => {
     } catch (e: unknown) {
       console.error(e);
       showToast(`Funding failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
     }
   };
 
   const handleApproveDeliverables = async (orderId: string) => {
     const order = clientOrders.find(o => o.id === orderId);
     if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
-    showToast(`Approving deliverables for order ${orderId} on-chain...`, 'info');
     try {
+      showLoading(`Approving deliverables for order on-chain...`);
       await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address));
       
       const milestones = order.milestones ? [...order.milestones] : [];
@@ -174,14 +176,16 @@ export const ActiveProjectsView: React.FC = () => {
     } catch (e: unknown) {
       console.error(e);
       showToast(`Approval failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
     }
   };
 
   const handleDenyDeliverables = async (orderId: string, reason: string) => {
     const order = clientOrders.find(o => o.id === orderId);
     if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
-    showToast(`Denying deliverables for order ${orderId} on-chain...`, 'info');
     try {
+      showLoading(`Denying deliverables on-chain...`);
       await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address));
       
       const milestones = order.milestones ? [...order.milestones] : [];
@@ -209,6 +213,8 @@ export const ActiveProjectsView: React.FC = () => {
     } catch (e: unknown) {
       console.error(e);
       showToast(`Denial failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
     }
   };
 
@@ -216,8 +222,8 @@ export const ActiveProjectsView: React.FC = () => {
     const order = clientOrders.find(o => o.id === orderId);
     if (!order || !order.txHash || !address) return showToast('Error: Missing data', 'error');
     
-    showToast(`Paying for additional revision on-chain...`, 'info');
     try {
+      showLoading(`Paying for additional revision on-chain...`);
       const stroopsPerCent = await getOraclePrice();
       // Assume paid revision price is 1000 ($10) as in deployment
       const totalXlmRequired = (BigInt(1000) * BigInt(stroopsPerCent)).toString();
@@ -225,7 +231,6 @@ export const ActiveProjectsView: React.FC = () => {
       const contract = await import('@/lib/contract');
       await contract.payForRevision(order.txHash!, address, totalXlmRequired);
       
-      showToast(`Revision paid! Authorizing deliverable denial on-chain...`, 'info');
       await contract.denyDeliverable(order.txHash!, address);
       
       const milestones = order.milestones ? [...order.milestones] : [];
@@ -254,6 +259,8 @@ export const ActiveProjectsView: React.FC = () => {
     } catch (e: unknown) {
       console.error(e);
       showToast(`Transaction failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      hideLoading();
     }
   };
 

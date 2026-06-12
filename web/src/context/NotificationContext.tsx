@@ -28,6 +28,8 @@ interface NotificationContextProps {
     cancelText?: string
   ) => void;
   showAlert: (title: string, message: string) => void;
+  showLoading: (message?: string) => void;
+  hideLoading: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextProps | undefined>(undefined);
@@ -35,6 +37,15 @@ const NotificationContext = createContext<NotificationContextProps | undefined>(
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [modal, setModal] = useState<ModalConfig | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+
+  const showLoading = useCallback((message: string = 'Please wait...') => {
+    setLoadingMessage(message);
+  }, []);
+
+  const hideLoading = useCallback(() => {
+    setLoadingMessage(null);
+  }, []);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -84,7 +95,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   return (
-    <NotificationContext.Provider value={{ showToast, showConfirm, showAlert }}>
+    <NotificationContext.Provider value={{ showToast, showConfirm, showAlert, showLoading, hideLoading }}>
       {children}
 
       {/* Global Toast Stack */}
@@ -157,6 +168,21 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 {modal.confirmText}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global Loading Overlay */}
+      {loadingMessage && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="w-16 h-16 border-4 border-neoncyan border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(0,243,255,0.4)]"></div>
+          <h2 className="text-xl font-heading font-bold text-white mb-2">Transaction in Progress</h2>
+          <p className="text-sm text-neoncyan font-bold">{loadingMessage}</p>
+          <div className="mt-6 p-4 bg-slate-900 border border-slate-700/50 rounded-xl max-w-sm flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-slate-300 leading-relaxed font-sans text-left">
+              Please wait for the wallet signature and network confirmation. <strong className="text-amber-500">Do not refresh or close this tab</strong> to avoid misinputs or failed transactions.
+            </p>
           </div>
         </div>
       )}
