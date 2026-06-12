@@ -12,6 +12,7 @@ import {
   acceptDisputeSplit,
   rejectDisputeSplit,
   claimDisputeTimeout,
+  escalateToMediator,
   DisputeProposal,
 } from '@/lib/contract';
 
@@ -179,6 +180,35 @@ export const DisputeModal: React.FC<DisputeModalProps> = ({
     }
   };
 
+  const handleInvokeMediator = async () => {
+    if (!order.txHash) return;
+    try {
+      showLoading('Invoking mediator on-chain...');
+      await escalateToMediator(order.txHash, currentAddress);
+
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: `Mediator invoked by ${
+          currentAddress === order.clientAddress ? 'Client' : 'Freelancer'
+        }. Direct negotiation closed.`,
+      };
+
+      await updateOrderStatus(order.id, {
+        status: 'mediation',
+        changelogs: [...(order.changelogs || []), newChangelog],
+      });
+
+      showToast('Mediator successfully invoked!', 'success');
+      onSuccess();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to invoke mediator.', 'error');
+    } finally {
+      hideLoading();
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -220,7 +250,19 @@ export const DisputeModal: React.FC<DisputeModalProps> = ({
             </div>
           )}
 
-          {!proposal ? (
+          {order.status === 'mediation' ? (
+            /* Mediator Invoked Panel */
+            <div className="space-y-4">
+              <div className="bg-orange-500/10 border border-orange-500/20 p-5 rounded-xl space-y-3 text-center">
+                <ShieldAlert className="w-10 h-10 text-orange-500 mx-auto animate-pulse" />
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Mediator Invoked</h4>
+                <p className="text-xs text-gray-300 leading-relaxed">
+                  Either you or the other party has invoked the mediator to settle this dispute. 
+                  Direct negotiation is now closed, and the final split settlement rests solely in the hands of the mediator.
+                </p>
+              </div>
+            </div>
+          ) : !proposal ? (
             /* Propose split panel */
             <div className="space-y-4">
               <div className="bg-neoncyan/10 border border-neoncyan/20 p-4 rounded-xl space-y-2">
@@ -257,6 +299,15 @@ export const DisputeModal: React.FC<DisputeModalProps> = ({
               >
                 Propose split settlement
               </button>
+
+              <div className="pt-2 border-t border-white/5 mt-4">
+                <button
+                  onClick={handleInvokeMediator}
+                  className="w-full py-2 rounded border border-orange-500/50 text-orange-500 hover:bg-orange-500/10 transition-colors cursor-pointer text-xs font-bold uppercase tracking-wider flex justify-center items-center gap-1.5"
+                >
+                  <ShieldAlert className="w-4 h-4" /> Invoke Mediator
+                </button>
+              </div>
             </div>
           ) : isProposer ? (
             /* Proposal submitted, waiting for response / timeout */
@@ -279,6 +330,15 @@ export const DisputeModal: React.FC<DisputeModalProps> = ({
               >
                 Execute 50/50 Timeout Split
               </button>
+
+              <div className="pt-2 border-t border-white/5 mt-4">
+                <button
+                  onClick={handleInvokeMediator}
+                  className="w-full py-2 rounded border border-orange-500/50 text-orange-500 hover:bg-orange-500/10 transition-colors cursor-pointer text-xs font-bold uppercase tracking-wider flex justify-center items-center gap-1.5"
+                >
+                  <ShieldAlert className="w-4 h-4" /> Invoke Mediator
+                </button>
+              </div>
             </div>
           ) : (
             /* Decision panel for opposite party */
@@ -316,6 +376,15 @@ export const DisputeModal: React.FC<DisputeModalProps> = ({
                 <p className="text-[10px] text-center text-red-500 italic mt-1">
                   * Warning: Rejecting will permanently burn the remaining XLM funds, giving $0 to both parties.
                 </p>
+
+                <div className="pt-2 border-t border-white/5 mt-4">
+                  <button
+                    onClick={handleInvokeMediator}
+                    className="w-full py-2 rounded border border-orange-500/50 text-orange-500 hover:bg-orange-500/10 transition-colors cursor-pointer text-xs font-bold uppercase tracking-wider flex justify-center items-center gap-1.5"
+                  >
+                    <ShieldAlert className="w-4 h-4" /> Invoke Mediator
+                  </button>
+                </div>
               </div>
             </div>
           )}

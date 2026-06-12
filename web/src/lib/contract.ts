@@ -232,6 +232,16 @@ export async function requestMediation(contractId: string, callerAddress: string
   return submitTransaction(txBuilder);
 }
 
+export async function escalateToMediator(contractId: string, callerAddress: string) {
+  const account = await server.getAccount(callerAddress);
+  const contract = new Contract(contractId);
+  
+  const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(contract.call('escalate_to_mediator', new Address(callerAddress).toScVal()));
+
+  return submitTransaction(txBuilder);
+}
+
 export interface DisputeProposal {
   proposer: string;
   freelancerPayout: bigint;

@@ -445,6 +445,10 @@ fn test_mediator_resolve_dispute() {
     client.request_mediation(&client_addr);
     assert_eq!(client.get_status(), EscrowStatus::Disputed);
 
+    // Escalate to mediator
+    client.escalate_to_mediator(&client_addr);
+    assert_eq!(client.get_status(), EscrowStatus::Mediation);
+
     // Mediator resolves the dispute
     let f_payout = 10_000_000_000i128;
     let c_refund = 5_000_000_000i128;
@@ -457,4 +461,86 @@ fn test_mediator_resolve_dispute() {
     assert_eq!(token_client.balance(&freelancer), 10_000_000_000i128);
     assert_eq!(token_client.balance(&client_addr), 30_000_000_000i128); // 40B - 15B + 5B
     assert_eq!(client.get_locked_balance(), 0i128);
+}
+
+#[test]
+#[should_panic(expected = "Invalid status")]
+fn test_mediator_resolve_fails_before_escalation() {
+    let env = Env::default();
+    let (freelancer, client_addr, token, oracle, mediator, client) = setup_test_env(&env);
+    
+    let milestones = soroban_sdk::vec![&env, Milestone {
+        payout_amount_usd: 10000,
+        max_revisions: 2,
+        revisions_used: 0,
+        state: MilestoneState::Locked,
+    }];
+
+    client.initialize(
+        &freelancer,
+        &client_addr,
+        &token,
+        &oracle,
+        &mediator,
+        &5000,
+        &1000,
+        &milestones,
+        &1209600,
+        &2592000,
+    );
+
+    let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
+    env.mock_all_auths();
+    stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
+    client.fund(&client_addr, &30_000_000_000i128);
+
+    // Request mediation
+    client.request_mediation(&client_addr);
+    assert_eq!(client.get_status(), EscrowStatus::Disputed);
+
+    // Try resolving as mediator before escalation -> should panic
+    client.resolve_dispute(&mediator, &10_000_000_000i128, &5_000_000_000i128);
+}
+
+#[test]
+#[should_panic(expected = "Invalid status")]
+fn test_escalation_blocks_p2p_propose() {
+    let env = Env::default();
+    let (freelancer, client_addr, token, oracle, mediator, client) = setup_test_env(&env);
+    
+    let milestones = soroban_sdk::vec![&env, Milestone {
+        payout_amount_usd: 10000,
+        max_revisions: 2,
+        revisions_used: 0,
+        state: MilestoneState::Locked,
+    }];
+
+    client.initialize(
+        &freelancer,
+        &client_addr,
+        &token,
+        &oracle,
+        &mediator,
+        &5000,
+        &1000,
+        &milestones,
+        &1209600,
+        &2592000,
+    );
+
+    let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
+    env.mock_all_auths();
+    stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
+    client.fund(&client_addr, &30_000_000_000i128);
+
+    // Request mediation
+    client.request_mediation(&client_addr);
+    assert_eq!(client.get_status(), EscrowStatus::Disputed);
+
+    // Escalate to mediator
+    client.escalate_to_mediator(&client_addr);
+    assert_eq!(client.get_status(), EscrowStatus::Mediation);
+
+    // This should panic because contract is now in Mediation status
+    client.propose_dispute_split(&client_addr, &9_000_000_000i128, &6_000_000_000i128);
 }

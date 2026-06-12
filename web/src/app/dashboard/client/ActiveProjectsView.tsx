@@ -21,6 +21,7 @@ function getStatusBadge(order: Order) {
   if (order.status === 'awaiting_funding') return { text: 'Awaiting Funding', classes: 'bg-[#331133]/80 text-[#ff00ff] border border-[#ff00ff]/30 shadow-[0_0_8px_rgba(255,0,255,0.15)]' };
   if (order.status === 'delivered') return { text: 'Delivered', classes: 'bg-[#001a00]/80 text-[#39ff14] border border-[#39ff14]/30 shadow-[0_0_8px_rgba(57,255,20,0.15)]' };
   if (order.status === 'disputed') return { text: 'Disputed', classes: 'bg-red-950/80 text-red-500 border border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]' };
+  if (order.status === 'mediation') return { text: 'In Mediation', classes: 'bg-orange-950/80 text-orange-500 border border-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.15)]' };
   
   if (order.status === 'escrow_funded') {
     if (order.denialMessage) {
@@ -383,7 +384,10 @@ export const ActiveProjectsView: React.FC = () => {
       order.freelancerAddress.toLowerCase().includes(search.toLowerCase()) ||
       (order.gigInfo?.freelancerName.toLowerCase() || '').includes(search.toLowerCase()) ||
       (order.gigInfo?.title.toLowerCase() || '').includes(search.toLowerCase());
-    return matchesSearch && (statusFilter === 'all' || order.status === statusFilter);
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'disputed' && (order.status === 'disputed' || order.status === 'mediation')) || 
+      order.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -500,7 +504,7 @@ export const ActiveProjectsView: React.FC = () => {
                     </button>
                   </>
                 )}
-                {order.status === 'disputed' && (
+                {(order.status === 'disputed' || order.status === 'mediation') && (
                   <button
                     title="Dispute Panel"
                     onClick={() => setActiveDisputeOrder(order)}

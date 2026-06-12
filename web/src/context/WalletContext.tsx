@@ -152,7 +152,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       throw new Error('Freighter wallet extension was not detected. Please install it.');
     }
     return withTimeout(
-      freighter.getAddress(),
+      freighter.requestAccess(),
       'Request timed out waiting for wallet response.'
     );
   };
