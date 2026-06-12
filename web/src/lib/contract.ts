@@ -408,3 +408,23 @@ export async function getLockedBalance(contractId: string, callerAddress: string
   return BigInt(0);
 }
 
+export async function resolveDispute(
+  contractId: string,
+  mediatorAddress: string,
+  freelancerPayoutStroops: string,
+  clientRefundStroops: string
+) {
+  const account = await server.getAccount(mediatorAddress);
+  const contract = new Contract(contractId);
+  
+  const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(
+      contract.call('resolve_dispute',
+        new Address(mediatorAddress).toScVal(),
+        nativeToScVal(BigInt(freelancerPayoutStroops), { type: 'i128' }),
+        nativeToScVal(BigInt(clientRefundStroops), { type: 'i128' })
+      )
+    );
+
+  return submitTransaction(txBuilder);
+}
