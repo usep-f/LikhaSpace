@@ -5,6 +5,7 @@ import { storage } from '@/lib/firebase';
 import { ref, uploadBytes } from 'firebase/storage';
 import { updateOrderStatus } from '@/lib/db';
 import { submitDeliverable } from '@/lib/contract';
+import { useNotification } from '@/context/NotificationContext';
 
 interface SubmitDeliverableModalProps {
   order: Order;
@@ -13,6 +14,7 @@ interface SubmitDeliverableModalProps {
 }
 
 export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ order, onClose, onSuccess }) => {
+  const { showLoading, hideLoading } = useNotification();
   const [file, setFile] = useState<File | null>(null);
   const [link, setLink] = useState('');
   const [notes, setNotes] = useState('');
@@ -43,6 +45,7 @@ export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ 
     setError('');
 
     try {
+      showLoading('Submitting deliverables via Freighter...');
       let storagePath = '';
       let fileName = '';
 
@@ -86,6 +89,7 @@ export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ 
       setError(`Failed to submit: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsSubmitting(false);
+      hideLoading();
     }
   };
 
