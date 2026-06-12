@@ -15,7 +15,7 @@ export const HistoryView: React.FC = () => {
     if (!address) return;
     getClientOrders(address)
       .then(async (orders) => {
-        const completed = orders.filter(o => o.status === 'completed');
+        const completed = orders.filter(o => o.status === 'completed' || o.status === 'denied' || o.status === 'settled_dispute');
         const enriched = await Promise.all(
           completed.map(async (o) => {
             const gigInfo = await getGig(o.gigId);
@@ -48,7 +48,13 @@ export const HistoryView: React.FC = () => {
             <div key={order.id} className="p-6 rounded-xl glass-card border border-white/5 flex flex-col gap-4">
                <div className="flex justify-between items-start">
                  <div>
-                    <p className="text-xs uppercase font-bold tracking-wider text-neongreen mb-1">Completed Order</p>
+                     <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${
+                       order.status === 'completed' ? 'text-neongreen' : 
+                       order.status === 'settled_dispute' ? 'text-yellow-500' : 'text-red-400'
+                     }`}>
+                       {order.status === 'completed' ? 'Completed Order' : 
+                        order.status === 'settled_dispute' ? 'Settled Dispute' : 'Cancelled Order'}
+                     </p>
                     <p className="text-sm font-bold text-white flex items-center gap-1">
                       Freelancer: {order.gigInfo?.freelancerName || order.freelancerAddress}
                       <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
