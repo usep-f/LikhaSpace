@@ -133,6 +133,7 @@ impl LikhaEscrow {
         paid_revision_price_usd: i128,
         milestones: Vec<Milestone>,
     ) {
+        client.require_auth();
         assert!(!env.storage().instance().has(&DataKey::Config), "Already initialized");
 
         let config = EscrowConfig {

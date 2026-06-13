@@ -23,6 +23,7 @@ impl LocalOracleMock {
 }
 
 fn setup_test_env(env: &Env) -> (Address, Address, Address, Address, Address, Address, LikhaEscrowClient<'static>) {
+    env.mock_all_auths();
     let contract_id = env.register(LikhaEscrow, ());
     let client = LikhaEscrowClient::new(env, &contract_id);
 
