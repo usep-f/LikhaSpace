@@ -74,6 +74,7 @@ pub enum DataKey {
     LockedXlmBalance, // Stroops locked
     StroopsPerCent, // Stored oracle conversion rate at funding
     DisputeProposal,
+    HasSubmittedOnce,
 }
 
 #[contracttype]
@@ -156,6 +157,7 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::Milestones, &milestones);
         env.storage().instance().set(&DataKey::CurrentMilestoneIdx, &0u32);
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::HasSubmittedOnce, &false);
         extend_instance_ttl(&env);
     }
 
@@ -213,6 +215,7 @@ impl LikhaEscrow {
         m.state = MilestoneState::Submitted;
         milestones.set(idx, m);
         env.storage().instance().set(&DataKey::Milestones, &milestones);
+        env.storage().instance().set(&DataKey::HasSubmittedOnce, &true);
         
         set_interaction(&env);
     }
@@ -339,6 +342,9 @@ impl LikhaEscrow {
         assert!(caller == config.client || caller == config.freelancer, "Only client or freelancer");
         caller.require_auth();
         check_status(&env, EscrowStatus::Funded);
+
+        let has_submitted: bool = env.storage().instance().get(&DataKey::HasSubmittedOnce).unwrap_or(false);
+        assert!(has_submitted, "Cannot dispute before the first submission");
 
         let idx: u32 = env.storage().instance().get(&DataKey::CurrentMilestoneIdx).unwrap();
         let mut milestones: Vec<Milestone> = env.storage().instance().get(&DataKey::Milestones).unwrap();
@@ -612,6 +618,10 @@ impl LikhaEscrow {
 
     pub fn get_locked_balance(env: Env) -> i128 {
         env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap_or(0)
+    }
+
+    pub fn get_has_submitted_once(env: Env) -> bool {
+        env.storage().instance().get(&DataKey::HasSubmittedOnce).unwrap_or(false)
     }
 }
 

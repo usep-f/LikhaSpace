@@ -425,52 +425,87 @@ export const ActiveProjectsView: React.FC = () => {
               </div>
 
               <div className="flex gap-2 flex-wrap justify-end">
-                {order.status === 'awaiting_funding' && (
-                  <>
-                    <button
-                      title="Fund Escrow"
-                      onClick={() => handleFundEscrow(order)}
-                      className="p-2.5 rounded bg-[#ff00ff]/20 border border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
-                    >
-                      <Activity className="w-5 h-5" />
-                    </button>
-                    <button
-                      title="Cancel Booking"
-                      onClick={() => handleCancelUnfunded(order)}
-                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </>
-                )}
-                {order.status === 'escrow_funded' && (
-                  <>
+                {/* Fund Escrow */}
+                <button
+                  title={
+                    order.status === 'awaiting_funding'
+                      ? "Fund Escrow"
+                      : "Fund Escrow (Only for bookings awaiting funding)"
+                  }
+                  disabled={order.status !== 'awaiting_funding'}
+                  onClick={() => handleFundEscrow(order)}
+                  className={`p-2.5 rounded border transition-colors ${
+                    order.status === 'awaiting_funding'
+                      ? "bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  <Activity className="w-5 h-5" />
+                </button>
 
-                    <button
-                      title="Dispute Project"
-                      onClick={() => handleDisputeProject(order)}
-                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
-                    >
-                      <ShieldAlert className="w-5 h-5" />
-                    </button>
-                    <button
-                      title="Cancel Project"
-                      onClick={() => setActiveCancelOrder(order)}
-                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </>
-                )}
-                {(order.status === 'disputed' || order.status === 'mediation') && (
-                  <button
-                    title="Dispute Panel"
-                    onClick={() => setActiveDisputeOrder(order)}
-                    className="p-2.5 rounded bg-yellow-500/20 border border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)] font-bold text-xs uppercase tracking-wider px-4 py-2"
-                  >
-                    Dispute Panel
-                  </button>
-                )}
+                {/* Dispute Project */}
+                <button
+                  title={
+                    order.status === 'escrow_funded'
+                      ? order.hasSubmittedOnce 
+                        ? "Dispute Project" 
+                        : "Dispute (Locked until first submission)"
+                      : "Dispute Project (Only for active funded projects)"
+                  }
+                  disabled={order.status !== 'escrow_funded' || !order.hasSubmittedOnce}
+                  onClick={() => handleDisputeProject(order)}
+                  className={`p-2.5 rounded border transition-colors ${
+                    (order.status === 'escrow_funded' && order.hasSubmittedOnce)
+                      ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  <ShieldAlert className="w-5 h-5" />
+                </button>
+
+                {/* Cancel Booking/Project */}
+                <button
+                  title={
+                    order.status === 'awaiting_funding'
+                      ? "Cancel Booking"
+                      : order.status === 'escrow_funded'
+                      ? "Cancel Project"
+                      : "Cancel Booking/Project (Unavailable)"
+                  }
+                  disabled={order.status !== 'awaiting_funding' && order.status !== 'escrow_funded'}
+                  onClick={() => {
+                    if (order.status === 'awaiting_funding') {
+                      handleCancelUnfunded(order);
+                    } else if (order.status === 'escrow_funded') {
+                      setActiveCancelOrder(order);
+                    }
+                  }}
+                  className={`p-2.5 rounded border transition-colors ${
+                    (order.status === 'awaiting_funding' || order.status === 'escrow_funded')
+                      ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                {/* Dispute Panel */}
+                <button
+                  title={
+                    (order.status === 'disputed' || order.status === 'mediation')
+                      ? "Dispute Panel"
+                      : "Dispute Panel (Only when project is in dispute)"
+                  }
+                  disabled={order.status !== 'disputed' && order.status !== 'mediation'}
+                  onClick={() => setActiveDisputeOrder(order)}
+                  className={`p-2.5 rounded transition-colors font-bold text-xs uppercase tracking-wider px-4 py-2 border ${
+                    (order.status === 'disputed' || order.status === 'mediation')
+                      ? "bg-yellow-500/20 border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  Dispute Panel
+                </button>
 
                 <button
                   title="Message"

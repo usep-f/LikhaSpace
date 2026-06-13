@@ -253,6 +253,9 @@ fn test_p2p_dispute_proposal_and_accept() {
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
     client.fund(&client_addr, &30_000_000_000i128);
 
+    // Submit deliverable to unlock dispute logic
+    client.submit_deliverable(&freelancer);
+
     // Request mediation (file dispute)
     client.request_mediation(&client_addr);
     assert_eq!(client.get_status(), EscrowStatus::Disputed);
@@ -309,6 +312,9 @@ fn test_p2p_dispute_proposal_and_reject() {
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
     client.fund(&client_addr, &30_000_000_000i128);
 
+    // Submit deliverable to unlock dispute logic
+    client.submit_deliverable(&freelancer);
+
     // Request mediation
     client.request_mediation(&client_addr);
 
@@ -356,6 +362,9 @@ fn test_p2p_dispute_timeout_50_50() {
     env.mock_all_auths();
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
     client.fund(&client_addr, &30_000_000_000i128);
+
+    // Submit deliverable to unlock dispute logic
+    client.submit_deliverable(&freelancer);
 
     // Request mediation
     client.request_mediation(&client_addr);
@@ -406,6 +415,9 @@ fn test_mediator_resolve_dispute() {
     env.mock_all_auths();
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
     client.fund(&client_addr, &30_000_000_000i128);
+
+    // Submit deliverable to unlock dispute logic
+    client.submit_deliverable(&freelancer);
 
     // Request mediation
     client.request_mediation(&client_addr);
@@ -458,6 +470,9 @@ fn test_mediator_resolve_fails_before_escalation() {
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
     client.fund(&client_addr, &30_000_000_000i128);
 
+    // Submit deliverable to unlock dispute logic
+    client.submit_deliverable(&freelancer);
+
     // Request mediation
     client.request_mediation(&client_addr);
     assert_eq!(client.get_status(), EscrowStatus::Disputed);
@@ -494,6 +509,9 @@ fn test_escalation_blocks_p2p_propose() {
     env.mock_all_auths();
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
     client.fund(&client_addr, &30_000_000_000i128);
+
+    // Submit deliverable to unlock dispute logic
+    client.submit_deliverable(&freelancer);
 
     // Request mediation
     client.request_mediation(&client_addr);
@@ -537,4 +555,37 @@ fn test_ttl_extension() {
 
     // Verify it was bumped to INSTANCE_BUMP_AMOUNT (518,400)
     assert_eq!(ttl, INSTANCE_BUMP_AMOUNT);
+}
+
+#[test]
+#[should_panic(expected = "Cannot dispute before the first submission")]
+fn test_request_mediation_fails_before_submission() {
+    let env = Env::default();
+    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    
+    let milestones = soroban_sdk::vec![&env, Milestone {
+        payout_amount_usd: 15000,
+        max_revisions: 2,
+        revisions_used: 0,
+        state: MilestoneState::Locked,
+    }];
+
+    client.initialize(
+        &freelancer,
+        &client_addr,
+        &token,
+        &oracle,
+        &mediator,
+        &treasury,
+        &1000,
+        &milestones,
+    );
+
+    let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
+    env.mock_all_auths();
+    stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
+    client.fund(&client_addr, &30_000_000_000i128);
+
+    // Try to request mediation before any submission - should panic
+    client.request_mediation(&client_addr);
 }
