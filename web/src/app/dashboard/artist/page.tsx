@@ -14,7 +14,7 @@ import { ChatModal } from '@/components/ChatModal';
 import { StatusModal } from '@/components/StatusModal';
 import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 import { DisputeModal } from '@/components/DisputeModal';
-import { refundRemaining, cancelUnfunded, requestMediation } from '@/lib/contract';
+import { freelancerCancel, cancelUnfunded, requestMediation } from '@/lib/contract';
 
 function getStatusBadge(order: Order) {
   if (order.status === 'pending_acceptance') return { text: 'Pending Acceptance', classes: 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' };
@@ -137,7 +137,6 @@ const ListingsView: React.FC = () => {
         category: updatedGig.category || 'design',
         description: updatedGig.description || '',
         priceUSD: updatedGig.priceUSD || 100,
-        upfrontPercentage: updatedGig.upfrontPercentage || 20,
         tags: updatedGig.tags || [],
         status: updatedGig.status || 'active',
         milestones: updatedGig.milestones || [],
@@ -321,7 +320,7 @@ const OrdersView: React.FC = () => {
         if (!address || !order.txHash) return showToast('Missing contract or wallet data', 'error');
         try {
           showLoading('Canceling project and refunding client on-chain...');
-          await refundRemaining(order.txHash, address);
+          await freelancerCancel(order.txHash, address);
 
           const newChangelog = {
             id: crypto.randomUUID(),
@@ -410,7 +409,7 @@ const OrdersView: React.FC = () => {
                    </p>
                  </div>
                  <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
-                 <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} • Upfront: {order.upfrontPercentage}%</p>
+                 <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
                </div>
 
                <div className="flex-1 w-full flex flex-col justify-end items-end gap-2">

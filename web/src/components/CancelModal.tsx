@@ -16,14 +16,18 @@ export const CancelModal: React.FC<CancelModalProps> = ({ order, onClose, onConf
   const isSubmitted = currentMilestone?.state === 'submitted';
 
   // Financial calculations
-  const upfrontAmount = order.priceUSD * (order.upfrontPercentage / 100);
-  const upfrontReleased = !!order.upfrontReleased;
-
   const completedMilestones = milestones.slice(0, currentIdx);
   const completedPayout = completedMilestones.reduce((sum, m) => sum + m.payoutUSD, 0);
 
-  const freelancerTotal = upfrontReleased ? (upfrontAmount + completedPayout) : 0;
-  const clientRefund = order.priceUSD - freelancerTotal;
+  const activeMilestonePayout = currentMilestone ? currentMilestone.payoutUSD : 0;
+  const killFee = activeMilestonePayout * 0.75;
+  const activeMilestoneRefund = activeMilestonePayout - killFee;
+
+  const futureMilestones = milestones.slice(currentIdx + 1);
+  const futureRefund = futureMilestones.reduce((sum, m) => sum + m.payoutUSD, 0);
+
+  const freelancerTotal = completedPayout + killFee;
+  const clientRefund = activeMilestoneRefund + futureRefund;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -61,12 +65,12 @@ export const CancelModal: React.FC<CancelModalProps> = ({ order, onClose, onConf
             <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Cancellation Financial Breakdown</h4>
             <div className="bg-obsidian border border-white/5 rounded-xl p-4 space-y-2.5">
               <div className="flex justify-between text-xs">
-                <span className="text-gray-400">Upfront Payment ({upfrontReleased ? 'already released' : 'reclaimed'}):</span>
-                <span className="text-white font-medium">${upfrontAmount.toFixed(2)} USD</span>
+                <span className="text-gray-400">Completed Milestones (Kept):</span>
+                <span className="text-white font-medium">${completedPayout.toFixed(2)} USD</span>
               </div>
               <div className="flex justify-between text-xs border-b border-white/5 pb-2.5">
-                <span className="text-gray-400">Completed Milestones (kept):</span>
-                <span className="text-white font-medium">${completedPayout.toFixed(2)} USD</span>
+                <span className="text-hotpink font-bold">75% Kill-Fee (Current Active Milestone):</span>
+                <span className="text-hotpink font-bold">${killFee.toFixed(2)} USD</span>
               </div>
               <div className="flex justify-between text-xs pt-1">
                 <span className="text-neongreen font-semibold">Your Total Refund:</span>

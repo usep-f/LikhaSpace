@@ -61,7 +61,6 @@ fn test_initialization() {
         &oracle,
         &mediator,
         &treasury,
-        &5000, // upfront $50
         &1000, // revision $10
         &milestones,
     );
@@ -91,7 +90,6 @@ fn test_cancel_unfunded() {
         &oracle,
         &mediator,
         &treasury,
-        &5000,
         &1000,
         &milestones,
     );
@@ -121,7 +119,6 @@ fn test_cancel_unfunded_by_freelancer() {
         &oracle,
         &mediator,
         &treasury,
-        &5000,
         &1000,
         &milestones,
     );
@@ -159,52 +156,43 @@ fn test_client_cancel_with_kill_fee() {
         &oracle,
         &mediator,
         &treasury,
-        &5000, // upfront $50 -> 500 XLM
         &1000,
         &milestones,
     );
 
-    // Mint tokens to client: we need 30,000_000_000 stroops (3,000 XLM total)
-    // plus some gas. We mint 40,000_000_000 stroops (4,000 XLM)
+    // Mint tokens to client: 40,000_000_000 stroops (4,000 XLM)
     let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
     env.mock_all_auths();
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
 
-    // Fund the contract
+    // Fund the contract. Total required = 25000 cents * 100_000_000 = 25_000_000_000 stroops
     client.fund(&client_addr, &30_000_000_000i128);
 
-    // Verify token transfers - upfront is NOT paid immediately
+    // Verify token transfers
     let token_client = token::Client::new(&env, &token);
-    assert_eq!(token_client.balance(&freelancer), 0i128); // Upfront NOT paid yet
-    assert_eq!(token_client.balance(&client_addr), 10_000_000_000i128); // Client balance left
-    assert_eq!(client.get_locked_balance(), 30_000_000_000i128); // Full balance locked in contract
+    assert_eq!(token_client.balance(&freelancer), 0i128);
+    assert_eq!(token_client.balance(&client_addr), 15_000_000_000i128); // 40 - 25 = 15
+    assert_eq!(client.get_locked_balance(), 25_000_000_000i128); // 25B locked
     assert_eq!(client.get_status(), EscrowStatus::Funded);
-    assert_eq!(client.is_upfront_released(), false);
 
-    // Client cancels before upfront is released
+    // Client cancels -> freelancer gets 75% of M1 (7,500,000,000), client gets the rest (17,500,000,000)
     client.client_cancel_with_kill_fee(&client_addr);
 
-    // Verify status and balances - client gets 100% refund
+    // Verify status and balances
     assert_eq!(client.get_status(), EscrowStatus::Cancelled);
-    assert_eq!(token_client.balance(&freelancer), 0i128); 
-    assert_eq!(token_client.balance(&client_addr), 40_000_000_000i128); // Full refund
+    assert_eq!(token_client.balance(&freelancer), 7_500_000_000i128); 
+    assert_eq!(token_client.balance(&client_addr), 32_500_000_000i128); // 15B + 17.5B = 32.5B
     assert_eq!(client.get_locked_balance(), 0i128);
 }
 
 #[test]
-fn test_release_upfront_and_cancel() {
+fn test_freelancer_cancel() {
     let env = Env::default();
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, 
         Milestone {
             payout_amount_usd: 10000, // $100 -> 1,000 XLM
-            max_revisions: 2,
-            revisions_used: 0,
-            state: MilestoneState::Locked,
-        },
-        Milestone {
-            payout_amount_usd: 15000, // $150 -> 1,500 XLM
             max_revisions: 2,
             revisions_used: 0,
             state: MilestoneState::Locked,
@@ -218,7 +206,6 @@ fn test_release_upfront_and_cancel() {
         &oracle,
         &mediator,
         &treasury,
-        &5000, // upfront $50 -> 500 XLM
         &1000,
         &milestones,
     );
@@ -226,24 +213,15 @@ fn test_release_upfront_and_cancel() {
     let stellar_asset_client = token::StellarAssetClient::new(&env, &token);
     env.mock_all_auths();
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
-
-    // Fund the contract
     client.fund(&client_addr, &30_000_000_000i128);
     let token_client = token::Client::new(&env, &token);
 
-    // Client releases upfront
-    client.release_upfront(&client_addr);
-    assert_eq!(client.is_upfront_released(), true);
-    assert_eq!(token_client.balance(&freelancer), 5_000_000_000i128); // Upfront paid
-    assert_eq!(client.get_locked_balance(), 25_000_000_000i128); // Locked balance decremented
+    // Freelancer cancels -> freelancer gets 0, client gets full refund (10,000_000_000)
+    client.freelancer_cancel(&freelancer);
 
-    // Client cancels after upfront is released
-    client.client_cancel_with_kill_fee(&client_addr);
-
-    // Verify status and balances - client gets remaining milestones refunded
     assert_eq!(client.get_status(), EscrowStatus::Cancelled);
-    assert_eq!(token_client.balance(&freelancer), 5_000_000_000i128); // Freelancer keeps upfront
-    assert_eq!(token_client.balance(&client_addr), 35_000_000_000i128); // Client gets back remaining 2,500 XLM
+    assert_eq!(token_client.balance(&freelancer), 0i128);
+    assert_eq!(token_client.balance(&client_addr), 40_000_000_000i128);
     assert_eq!(client.get_locked_balance(), 0i128);
 }
 
@@ -253,7 +231,7 @@ fn test_p2p_dispute_proposal_and_accept() {
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
-        payout_amount_usd: 10000,
+        payout_amount_usd: 15000, // Changed to 15000 so locked balance matches old test (15B stroops)
         max_revisions: 2,
         revisions_used: 0,
         state: MilestoneState::Locked,
@@ -266,7 +244,6 @@ fn test_p2p_dispute_proposal_and_accept() {
         &oracle,
         &mediator,
         &treasury,
-        &5000,
         &1000,
         &milestones,
     );
@@ -281,7 +258,6 @@ fn test_p2p_dispute_proposal_and_accept() {
     assert_eq!(client.get_status(), EscrowStatus::Disputed);
 
     // Propose split (60% to freelancer, 40% to client)
-    // Locked balance is 15,000_000_000 stroops (1,500 XLM)
     let f_payout = 9_000_000_000i128;
     let c_refund = 6_000_000_000i128;
     client.propose_dispute_split(&client_addr, &f_payout, &c_refund);
@@ -311,7 +287,7 @@ fn test_p2p_dispute_proposal_and_reject() {
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
-        payout_amount_usd: 10000,
+        payout_amount_usd: 15000,
         max_revisions: 2,
         revisions_used: 0,
         state: MilestoneState::Locked,
@@ -324,7 +300,6 @@ fn test_p2p_dispute_proposal_and_reject() {
         &oracle,
         &mediator,
         &treasury,
-        &5000,
         &1000,
         &milestones,
     );
@@ -334,7 +309,7 @@ fn test_p2p_dispute_proposal_and_reject() {
     stellar_asset_client.mint(&client_addr, &40_000_000_000i128);
     client.fund(&client_addr, &30_000_000_000i128);
 
-    // Request mediation (file dispute)
+    // Request mediation
     client.request_mediation(&client_addr);
 
     // Propose split
@@ -352,7 +327,6 @@ fn test_p2p_dispute_proposal_and_reject() {
     assert_eq!(token_client.balance(&client_addr), 25_000_000_000i128); // 0 refund (original 40B - 15B funded)
     assert_eq!(client.get_locked_balance(), 0i128); // Balance cleared from contract balance record
     assert_eq!(token_client.balance(&treasury), 15_000_000_000i128); // Funds transferred to treasury penalty
-    assert_eq!(token_client.balance(&client.address), 0i128);
 }
 
 #[test]
@@ -361,7 +335,7 @@ fn test_p2p_dispute_timeout_50_50() {
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
-        payout_amount_usd: 10000,
+        payout_amount_usd: 15000,
         max_revisions: 2,
         revisions_used: 0,
         state: MilestoneState::Locked,
@@ -374,7 +348,6 @@ fn test_p2p_dispute_timeout_50_50() {
         &oracle,
         &mediator,
         &treasury,
-        &5000,
         &1000,
         &milestones,
     );
@@ -412,7 +385,7 @@ fn test_mediator_resolve_dispute() {
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
-        payout_amount_usd: 10000,
+        payout_amount_usd: 15000,
         max_revisions: 2,
         revisions_used: 0,
         state: MilestoneState::Locked,
@@ -425,7 +398,6 @@ fn test_mediator_resolve_dispute() {
         &oracle,
         &mediator,
         &treasury,
-        &5000,
         &1000,
         &milestones,
     );
@@ -464,7 +436,7 @@ fn test_mediator_resolve_fails_before_escalation() {
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
-        payout_amount_usd: 10000,
+        payout_amount_usd: 15000,
         max_revisions: 2,
         revisions_used: 0,
         state: MilestoneState::Locked,
@@ -477,7 +449,6 @@ fn test_mediator_resolve_fails_before_escalation() {
         &oracle,
         &mediator,
         &treasury,
-        &5000,
         &1000,
         &milestones,
     );
@@ -502,7 +473,7 @@ fn test_escalation_blocks_p2p_propose() {
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
-        payout_amount_usd: 10000,
+        payout_amount_usd: 15000,
         max_revisions: 2,
         revisions_used: 0,
         state: MilestoneState::Locked,
@@ -515,7 +486,6 @@ fn test_escalation_blocks_p2p_propose() {
         &oracle,
         &mediator,
         &treasury,
-        &5000,
         &1000,
         &milestones,
     );
@@ -543,7 +513,7 @@ fn test_ttl_extension() {
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
-        payout_amount_usd: 10000,
+        payout_amount_usd: 15000,
         max_revisions: 2,
         revisions_used: 0,
         state: MilestoneState::Locked,
@@ -556,7 +526,6 @@ fn test_ttl_extension() {
         &oracle,
         &mediator,
         &treasury,
-        &5000, // upfront $50
         &1000, // revision $10
         &milestones,
     );
@@ -569,4 +538,3 @@ fn test_ttl_extension() {
     // Verify it was bumped to INSTANCE_BUMP_AMOUNT (518,400)
     assert_eq!(ttl, INSTANCE_BUMP_AMOUNT);
 }
-

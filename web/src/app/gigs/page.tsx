@@ -71,7 +71,6 @@ function GigsContent() {
         freelancerAddress: gig.freelancerAddress,
         status: 'pending_acceptance',
         priceUSD: gig.priceUSD,
-        upfrontPercentage: gig.upfrontPercentage,
         proposalText: message,
         progressPercentage: 0,
         changelogs: [],
