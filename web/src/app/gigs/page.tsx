@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { GigsFeed } from '@/components/GigsFeed';
 import { ProfileModal } from '@/components/ProfileModal';
 import { BookingModal } from '@/components/BookingModal';
+import { LoginModal } from '@/components/LoginModal';
 import { Gig, FreelancerProfile, Order } from '@/lib/mockGigs';
 import { useNotification } from '@/context/NotificationContext';
 import { useWallet } from '@/context/WalletContext';
@@ -26,6 +27,7 @@ function GigsContent() {
 
   const [selectedProfile, setSelectedProfile] = useState<FreelancerProfile | null>(null);
   const [selectedGigToBook, setSelectedGigToBook] = useState<Gig | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   const { showToast } = useNotification();
   const { address } = useWallet();
@@ -91,7 +93,13 @@ function GigsContent() {
         searchVal={currentSearch}
         onSearchChange={setCurrentSearch}
         onProfileClick={handleProfileClick}
-        onBookClick={(gig) => setSelectedGigToBook(gig)}
+        onBookClick={(gig) => {
+          if (!address) {
+            setShowLoginModal(true);
+          } else {
+            setSelectedGigToBook(gig);
+          }
+        }}
       />
 
       {/* Modals */}
@@ -108,6 +116,10 @@ function GigsContent() {
           onClose={() => setSelectedGigToBook(null)}
           onConfirm={handleBookGig}
         />
+      )}
+
+      {showLoginModal && (
+        <LoginModal onClose={() => setShowLoginModal(false)} message="Please connect your Stellar wallet to book a gig." />
       )}
     </>
   );
