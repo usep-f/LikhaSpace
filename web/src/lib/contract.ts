@@ -21,6 +21,7 @@ export const TESTNET_XLM = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHG
 
 // Mock Mediator logic: In a real app this would come from Firebase
 export const DEFAULT_MEDIATOR = process.env.NEXT_PUBLIC_MEDIATOR_ADDRESS || 'GAFBCLO24QMPVXFZJHVLRG6CKAGBJEMCW57UG45SS7PQ2LGMZTGY7DGX';
+export const PLATFORM_TREASURY = 'GC6QMW4WWFBXWZWLBIZ33PYWVXQGQYN3L7MBJ5BZTGT7UWJ5CHBSL3FU';
 
 export async function getOraclePrice(): Promise<number> {
   try {
@@ -133,11 +134,10 @@ async function initializeEscrowContract(
       new Address(TESTNET_XLM).toScVal(),
       new Address(ORACLE_ID).toScVal(),
       new Address(DEFAULT_MEDIATOR).toScVal(),
+      new Address(PLATFORM_TREASURY).toScVal(),
       nativeToScVal(BigInt(upfrontAmountUsd), { type: 'i128' }),
       nativeToScVal(BigInt(paidRevisionPriceUsd), { type: 'i128' }),
-      buildMilestonesScVal(milestones),
-      nativeToScVal(BigInt(1209600), { type: 'u64' }),
-      nativeToScVal(BigInt(2592000), { type: 'u64' })
+      buildMilestonesScVal(milestones)
     ));
 
   await submitTransaction(initTxBuilder);

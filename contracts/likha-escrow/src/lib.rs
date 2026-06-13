@@ -4,6 +4,9 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol, Vec,
 };
 
+pub const CLIENT_TIMEOUT: u64 = 1_209_600; // 14 days
+pub const FREELANCER_TIMEOUT: u64 = 2_592_000; // 30 days
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Milestone {
@@ -45,10 +48,9 @@ pub struct EscrowConfig {
     pub token: Address,
     pub oracle: Address,
     pub mediator: Address,
+    pub treasury: Address,
     pub upfront_amount_usd: i128,
     pub paid_revision_price_usd: i128,
-    pub client_timeout: u64,
-    pub freelancer_timeout: u64,
 }
 
 #[contracttype]
@@ -126,11 +128,10 @@ impl LikhaEscrow {
         token: Address,
         oracle: Address,
         mediator: Address,
+        treasury: Address,
         upfront_amount_usd: i128,
         paid_revision_price_usd: i128,
         milestones: Vec<Milestone>,
-        client_timeout: u64,
-        freelancer_timeout: u64,
     ) {
         assert!(!env.storage().instance().has(&DataKey::Config), "Already initialized");
 
@@ -140,10 +141,9 @@ impl LikhaEscrow {
             token,
             oracle,
             mediator,
+            treasury,
             upfront_amount_usd,
             paid_revision_price_usd,
-            client_timeout,
-            freelancer_timeout,
         };
 
         env.storage().instance().set(&DataKey::Config, &config);
@@ -426,6 +426,12 @@ impl LikhaEscrow {
 
         assert_ne!(caller, proposal.proposer, "Cannot reject own proposal");
 
+        let locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
+        if locked_xlm > 0 {
+            let token_client = token::Client::new(&env, &config.token);
+            token_client.transfer(&env.current_contract_address(), &config.treasury, &locked_xlm);
+        }
+
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
     }
@@ -510,7 +516,7 @@ impl LikhaEscrow {
 
         let last_time: u64 = env.storage().instance().get(&DataKey::LastInteractionTimestamp).unwrap();
         let now = env.ledger().timestamp();
-        assert!(now >= last_time + config.client_timeout, "Client timeout not reached");
+        assert!(now >= last_time + CLIENT_TIMEOUT, "Client timeout not reached");
 
         Self::internal_accept_deliverable(&env);
     }
@@ -528,7 +534,7 @@ impl LikhaEscrow {
 
         let last_time: u64 = env.storage().instance().get(&DataKey::LastInteractionTimestamp).unwrap();
         let now = env.ledger().timestamp();
-        assert!(now >= last_time + config.freelancer_timeout, "Freelancer timeout not reached");
+        assert!(now >= last_time + FREELANCER_TIMEOUT, "Freelancer timeout not reached");
 
         Self::internal_refund_all_to_client(&env);
     }
