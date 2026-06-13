@@ -80,6 +80,7 @@ export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ 
       await updateOrderStatus(order.id, {
         status: 'delivered', // Updates the main order status to delivered
         milestones: updatedMilestones,
+        hasSubmittedOnce: true,
         changelogs: [...(order.changelogs || []), newChangelog]
       });
 

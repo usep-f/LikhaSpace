@@ -398,6 +398,22 @@ export async function getLockedBalance(contractId: string, callerAddress: string
   return BigInt(0);
 }
 
+export async function getHasSubmittedOnce(contractId: string, callerAddress: string): Promise<boolean> {
+  try {
+    const account = await server.getAccount(callerAddress);
+    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
+      .addOperation(new Contract(contractId).call('get_has_submitted_once'))
+      .setTimeout(30).build();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationSuccess(sim) && sim.result) {
+      return scValToNative(sim.result.retval) as boolean;
+    }
+  } catch (e) {
+    console.error('Failed to query getHasSubmittedOnce:', e);
+  }
+  return false;
+}
+
 export async function resolveDispute(
   contractId: string,
   mediatorAddress: string,

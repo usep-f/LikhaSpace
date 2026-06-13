@@ -60,6 +60,7 @@ export interface Order {
   proposalText?: string;
   milestones?: MilestoneConfig[];
   currentMilestoneIdx?: number;
+  hasSubmittedOnce?: boolean;
 
   // Deliverables
   deliverablesLink?: string;
