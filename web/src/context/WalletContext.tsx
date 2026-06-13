@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc, deleteDoc, DocumentData } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { signInWithCustomToken, signOut } from 'firebase/auth';
+import { db, auth } from '../lib/firebase';
 import { useNotification } from './NotificationContext';
 
 export type UserRole = 'artist' | 'client' | 'mediator';
@@ -158,6 +159,54 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Connect wallet through Freighter API
+  /**
+   * Signs a challenge with Freighter and exchanges it for a Firebase Custom Token.
+   * This is the "Sign In With Stellar" (SIWS) pattern.
+   */
+  const signInWithStellar = async (stellarAddress: string): Promise<void> => {
+    // 1. Get a one-time nonce from our API route
+    const nonceRes = await fetch('/api/auth/stellar');
+    if (!nonceRes.ok) throw new Error('Failed to obtain auth nonce from server.');
+    const { nonce } = await nonceRes.json() as { nonce: string };
+
+    // 2. Build the message to sign for Freighter
+    const message = `LikhaSpace Auth:\n${nonce}`;
+
+    // 3. Ask Freighter to sign the message
+    const freighter = await import('@stellar/freighter-api');
+    const { NETWORK_PASSPHRASE } = await import('../lib/stellar');
+    
+    const signResult = await withTimeout(
+      freighter.signMessage(message, { 
+        address: stellarAddress,
+        networkPassphrase: NETWORK_PASSPHRASE
+      }),
+      'Freighter signing timed out.'
+    );
+    if ('error' in signResult && signResult.error) {
+      throw new Error(`Freighter signing failed: ${signResult.error}`);
+    }
+    const signedMessage = (signResult as { signedMessage: string | null }).signedMessage;
+    if (!signedMessage) {
+      throw new Error('No signature returned from Freighter.');
+    }
+
+    // 4. Send to server for verification — receive Firebase custom token
+    const verifyRes = await fetch('/api/auth/stellar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: stellarAddress, signedMessage, nonce }),
+    });
+    if (!verifyRes.ok) {
+      const { error } = await verifyRes.json() as { error: string };
+      throw new Error(error || 'Server rejected wallet signature.');
+    }
+    const { token } = await verifyRes.json() as { token: string };
+
+    // 5. Sign in to Firebase — now request.auth.uid === stellarAddress in Firestore rules
+    await signInWithCustomToken(auth, token);
+  };
+
   const connectWallet = async () => {
     setIsLoading(true);
     setError(null);
@@ -165,6 +214,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const info = await fetchFreighterAddress();
       if (info && info.address) {
         setHasAttemptedLogin(true);
+        // Authenticate with Firebase via wallet signature
+        await signInWithStellar(info.address);
         handleWalletSuccess(info.address);
       } else {
         throw new Error('No public key returned from Freighter. Is it unlocked?');
@@ -179,8 +230,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Disconnect wallet
+  // Disconnect wallet — also signs out from Firebase
   const disconnectWallet = () => {
+    void signOut(auth).catch(() => {}); // Best-effort Firebase sign-out
     setAddress(null);
     setRole(null);
     setUserProfile(null);

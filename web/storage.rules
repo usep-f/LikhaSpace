@@ -1,8 +1,33 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /deliverables/{allPaths=**} {
-      allow read, write: if true;
+    match /deliverables/{orderId}/{fileName} {
+      function getOrder() {
+        return firestore.get(/databases/(default)/documents/orders/$(orderId));
+      }
+      
+      function getUserRole() {
+        return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+      }
+
+      // Read allowed if auth is participant or mediator
+      allow read: if request.auth != null && (
+        getOrder().data.clientAddress == request.auth.uid ||
+        getOrder().data.freelancerAddress == request.auth.uid ||
+        getUserRole() == 'mediator'
+      );
+
+      // Write allowed for participants with size/type constraints
+      allow write: if request.auth != null
+        && (
+          getOrder().data.clientAddress == request.auth.uid ||
+          getOrder().data.freelancerAddress == request.auth.uid
+        )
+        && request.resource.size < 50 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*|application/pdf|video/.*|application/zip|text/.*|application/octet-stream|application/vnd\\.openxmlformats-officedocument.*|application/msword');
+
+      // Deletion not permitted by end users
+      allow delete: if false;
     }
   }
 }
