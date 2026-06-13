@@ -4,15 +4,14 @@ import {
   xdr,
   Address,
 } from '@stellar/stellar-sdk';
-import * as Freighter from '@stellar/freighter-api';
 import { server, NETWORK_PASSPHRASE } from './stellar';
+import { StellarWalletsKit } from './walletKit';
 
 async function validateActiveWallet(expectedAddr: string): Promise<void> {
-  const freighterInfo = await Freighter.getAddress();
-  const activeAddr = freighterInfo?.address;
-  if (activeAddr && activeAddr !== expectedAddr) {
+  const { address } = await StellarWalletsKit.getAddress();
+  if (address && address !== expectedAddr) {
     throw new Error(
-      `Wallet account mismatch: Active Freighter account is ${activeAddr}, but this action requires ${expectedAddr}. Please switch accounts in Freighter.`
+      `Wallet account mismatch: Active wallet account is ${address}, but this action requires ${expectedAddr}. Please switch accounts in your wallet.`
     );
   }
 }
@@ -25,17 +24,12 @@ export async function submitTransaction(txBuilder: TransactionBuilder) {
     throw new Error(`Simulation failed: ${simResponse.error}`);
   }
   const assembledTx = rpc.assembleTransaction(tx, simResponse);
-  const signedResponse = await Freighter.signTransaction(assembledTx.build().toXDR(), {
-    networkPassphrase: NETWORK_PASSPHRASE,
-  });
-  if (signedResponse.error) {
-    throw new Error(`Signing failed: ${signedResponse.error}`);
-  }
-  const signedResponseObj = signedResponse as unknown as { signedTxXdr?: string, signedTransaction?: string };
-  const signedTxXdr = signedResponseObj.signedTxXdr || signedResponseObj.signedTransaction;
+
+  const { signedTxXdr } = await StellarWalletsKit.signTransaction(assembledTx.build().toXDR());
   if (!signedTxXdr) {
-    throw new Error('No signed transaction returned from Freighter.');
+    throw new Error('No signed transaction returned from wallet.');
   }
+  
   const signedTx = TransactionBuilder.fromXDR(signedTxXdr, NETWORK_PASSPHRASE);
   const submission = await server.sendTransaction(signedTx);
   if (submission.status === 'ERROR') {

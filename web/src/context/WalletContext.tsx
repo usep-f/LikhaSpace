@@ -2,9 +2,11 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc, deleteDoc, DocumentData } from 'firebase/firestore';
-import { signInWithCustomToken, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
 import { useNotification } from './NotificationContext';
+import { loginWithStellar } from '../lib/auth';
+import { StellarWalletsKit } from '../lib/walletKit';
 
 export type UserRole = 'artist' | 'client' | 'mediator';
 
@@ -41,8 +43,6 @@ interface WalletContextProps {
 
 const WalletContext = createContext<WalletContextProps | undefined>(undefined);
 
-const TIMEOUT_MS = 5000;
-const STORAGE_ADDR_KEY = 'likhaspace_wallet_address';
 const STORAGE_ROLE_KEY = 'likhaspace_user_role';
 
 const mapFirebaseToProfile = (data: DocumentData): UserProfile => ({
@@ -61,7 +61,12 @@ const mapFirebaseToProfile = (data: DocumentData): UserProfile => ({
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [address, setAddress] = useState<string | null>(null);
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [role, setRole] = useState<UserRole | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(STORAGE_ROLE_KEY) as UserRole | null;
+    }
+    return null;
+  });
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -70,7 +75,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useNotification();
 
-  // Fetch user profile and sync sandbox rules from Firebase
   const fetchProfileFromFirebase = useCallback(async (publicKey: string) => {
     try {
       const docRef = doc(db, 'users', publicKey);
@@ -99,146 +103,63 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  // Load persisted session
+  // Listen to Firebase Auth state to load and persist session natively
   useEffect(() => {
-    const loadSession = async () => {
-      const savedAddress = localStorage.getItem(STORAGE_ADDR_KEY);
-      const savedRole = localStorage.getItem(STORAGE_ROLE_KEY) as UserRole | null;
-      
-      if (savedRole) {
-        setRole(savedRole);
-      }
-      if (savedAddress) {
-        setAddress(savedAddress);
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        const userAddress = firebaseUser.uid;
+        setAddress(userAddress);
         setIsConnected(true);
-        await fetchProfileFromFirebase(savedAddress);
+        setError(null);
+        await fetchProfileFromFirebase(userAddress);
+      } else {
+        setAddress(null);
+        setRole(null);
+        setUserProfile(null);
+        setIsRegistered(false);
+        setIsConnected(false);
       }
       setIsLoading(false);
-    };
-    
-    void loadSession();
-  }, [fetchProfileFromFirebase]);
-
-  const handleWalletSuccess = useCallback((publicKey: string) => {
-    setAddress(publicKey);
-    setIsConnected(true);
-    localStorage.setItem(STORAGE_ADDR_KEY, publicKey);
-    setError(null);
-    void fetchProfileFromFirebase(publicKey);
-  }, [fetchProfileFromFirebase]);
-
-  // Run a promise with a timeout limit
-  const withTimeout = <T,>(promise: Promise<T>, message: string): Promise<T> => {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(message)), TIMEOUT_MS);
-      promise
-        .then((res) => {
-          clearTimeout(timer);
-          resolve(res);
-        })
-        .catch((err) => {
-          clearTimeout(timer);
-          reject(err);
-        });
     });
-  };
 
-  const fetchFreighterAddress = async () => {
-    const freighter = await import('@stellar/freighter-api');
-    const conn = await withTimeout(
-      freighter.isConnected(),
-      'Connection timed out checking for Freighter extension.'
-    );
-    if (!conn || !conn.isConnected) {
-      throw new Error('Freighter wallet extension was not detected. Please install it.');
-    }
-    return withTimeout(
-      freighter.requestAccess(),
-      'Request timed out waiting for wallet response.'
-    );
-  };
-
-  // Connect wallet through Freighter API
-  /**
-   * Signs a challenge with Freighter and exchanges it for a Firebase Custom Token.
-   * This is the "Sign In With Stellar" (SIWS) pattern.
-   */
-  const signInWithStellar = async (stellarAddress: string): Promise<void> => {
-    // 1. Get a one-time nonce from our API route
-    const nonceRes = await fetch('/api/auth/stellar');
-    if (!nonceRes.ok) throw new Error('Failed to obtain auth nonce from server.');
-    const { nonce } = await nonceRes.json() as { nonce: string };
-
-    // 2. Build the message to sign for Freighter
-    const message = `LikhaSpace Auth:\n${nonce}`;
-
-    // 3. Ask Freighter to sign the message
-    const freighter = await import('@stellar/freighter-api');
-    const { NETWORK_PASSPHRASE } = await import('../lib/stellar');
-    
-    const signResult = await withTimeout(
-      freighter.signMessage(message, { 
-        address: stellarAddress,
-        networkPassphrase: NETWORK_PASSPHRASE
-      }),
-      'Freighter signing timed out.'
-    );
-    if ('error' in signResult && signResult.error) {
-      throw new Error(`Freighter signing failed: ${signResult.error}`);
-    }
-    const signedMessage = (signResult as { signedMessage: string | null }).signedMessage;
-    if (!signedMessage) {
-      throw new Error('No signature returned from Freighter.');
-    }
-
-    // 4. Send to server for verification — receive Firebase custom token
-    const verifyRes = await fetch('/api/auth/stellar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: stellarAddress, signedMessage, nonce }),
-    });
-    if (!verifyRes.ok) {
-      const { error } = await verifyRes.json() as { error: string };
-      throw new Error(error || 'Server rejected wallet signature.');
-    }
-    const { token } = await verifyRes.json() as { token: string };
-
-    // 5. Sign in to Firebase — now request.auth.uid === stellarAddress in Firestore rules
-    await signInWithCustomToken(auth, token);
-  };
+    return () => unsubscribe();
+  }, [fetchProfileFromFirebase]);
 
   const connectWallet = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const info = await fetchFreighterAddress();
-      if (info && info.address) {
+      const { address: walletAddr } = await StellarWalletsKit.authModal();
+      if (walletAddr) {
         setHasAttemptedLogin(true);
-        // Authenticate with Firebase via wallet signature
-        await signInWithStellar(info.address);
-        handleWalletSuccess(info.address);
+        await loginWithStellar(walletAddr);
       } else {
-        throw new Error('No public key returned from Freighter. Is it unlocked?');
+        throw new Error('No public key returned from wallet.');
       }
     } catch (err: unknown) {
       console.error('Wallet connection error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to connect to Freighter wallet.';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
+      let errMsg = 'Failed to connect wallet.';
+      if (err instanceof Error) {
+        errMsg = err.message;
+      } else if (typeof err === 'object' && err !== null && 'message' in err) {
+        errMsg = String((err as Record<string, unknown>).message);
+      }
+      if (errMsg !== 'The user closed the modal.') {
+        setError(errMsg);
+        showToast(errMsg, 'error');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Disconnect wallet — also signs out from Firebase
   const disconnectWallet = () => {
-    void signOut(auth).catch(() => {}); // Best-effort Firebase sign-out
+    void signOut(auth).catch(() => {});
     setAddress(null);
     setRole(null);
     setUserProfile(null);
     setIsRegistered(false);
     setIsConnected(false);
-    localStorage.removeItem(STORAGE_ADDR_KEY);
     localStorage.removeItem(STORAGE_ROLE_KEY);
   };
 
@@ -252,8 +173,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isLoading, isConnected, isRegistered, hasAttemptedLogin]);
 
-
-  // Set user role
   const selectRole = (newRole: UserRole) => {
     setRole(newRole);
     localStorage.setItem(STORAGE_ROLE_KEY, newRole);
@@ -288,16 +207,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsLoading(true);
     try {
       const docRef = doc(db, 'users', address);
-      // Hard-delete: completely remove the document to comply with Web3 / GDPR standards
       await deleteDoc(docRef);
-      
-      setAddress(null);
-      setRole(null);
-      setUserProfile(null);
-      setIsRegistered(false);
-      setIsConnected(false);
-      localStorage.removeItem(STORAGE_ADDR_KEY);
-      localStorage.removeItem(STORAGE_ROLE_KEY);
+      disconnectWallet();
     } catch (err: unknown) {
       console.error('Error soft-deleting profile:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete profile from database');
@@ -306,8 +217,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsLoading(false);
     }
   };
-
-  // updateVerificationRules is removed as rules are now codebase-global
 
   const clearError = () => {
     setError(null);
