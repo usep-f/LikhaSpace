@@ -2,7 +2,7 @@
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _}, token, Address, Env,
+    testutils::{Address as _, Ledger as _, storage::Instance as _}, token, Address, Env,
 };
 
 #[contract]
@@ -536,3 +536,37 @@ fn test_escalation_blocks_p2p_propose() {
     // This should panic because contract is now in Mediation status
     client.propose_dispute_split(&client_addr, &9_000_000_000i128, &6_000_000_000i128);
 }
+
+#[test]
+fn test_ttl_extension() {
+    let env = Env::default();
+    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    
+    let milestones = soroban_sdk::vec![&env, Milestone {
+        payout_amount_usd: 10000,
+        max_revisions: 2,
+        revisions_used: 0,
+        state: MilestoneState::Locked,
+    }];
+
+    client.initialize(
+        &freelancer,
+        &client_addr,
+        &token,
+        &oracle,
+        &mediator,
+        &treasury,
+        &5000, // upfront $50
+        &1000, // revision $10
+        &milestones,
+    );
+
+    // Get the TTL of the instance inside the contract environment
+    let ttl = env.as_contract(&client.address, || {
+        env.storage().instance().get_ttl()
+    });
+
+    // Verify it was bumped to INSTANCE_BUMP_AMOUNT (518,400)
+    assert_eq!(ttl, INSTANCE_BUMP_AMOUNT);
+}
+
