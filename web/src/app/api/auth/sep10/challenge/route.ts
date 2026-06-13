@@ -2,13 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Keypair, WebAuth, Networks } from '@stellar/stellar-sdk';
 import { STELLAR_NETWORK } from '@/lib/stellar';
 
-// For local development fallback to prevent crashes if env is not configured yet.
-const DEV_FALLBACK_SECRET = 'SBA2CJCTPQCXJBIQ6CZWKNXEQKY3VDR5W37TOSOE5CCNEICPNSBXK7MJ';
-
 function getServerKeypair(): Keypair {
-  const secret = process.env.SEP10_SERVER_SECRET || DEV_FALLBACK_SECRET;
-  if (!process.env.SEP10_SERVER_SECRET && process.env.NODE_ENV === 'production') {
-    throw new Error('SEP10_SERVER_SECRET must be set in production environment.');
+  const secret = process.env.SEP10_SERVER_SECRET;
+  if (!secret) {
+    throw new Error('SEP10_SERVER_SECRET is required but not configured.');
   }
   return Keypair.fromSecret(secret);
 }
