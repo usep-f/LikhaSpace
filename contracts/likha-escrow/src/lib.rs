@@ -7,6 +7,9 @@ use soroban_sdk::{
 pub const CLIENT_TIMEOUT: u64 = 1_209_600; // 14 days
 pub const FREELANCER_TIMEOUT: u64 = 2_592_000; // 30 days
 
+pub const INSTANCE_THRESHOLD: u32 = 120_960; // 7 days in ledgers (assuming 5s ledgers)
+pub const INSTANCE_BUMP_AMOUNT: u32 = 518_400; // 30 days in ledgers (assuming 5s ledgers)
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Milestone {
@@ -115,8 +118,13 @@ fn get_config(env: &Env) -> EscrowConfig {
     env.storage().instance().get(&DataKey::Config).unwrap()
 }
 
+fn extend_instance_ttl(env: &Env) {
+    env.storage().instance().extend_ttl(INSTANCE_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+}
+
 fn set_interaction(env: &Env) {
     env.storage().instance().set(&DataKey::LastInteractionTimestamp, &env.ledger().timestamp());
+    extend_instance_ttl(env);
 }
 
 #[contractimpl]
@@ -153,6 +161,7 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::CurrentMilestoneIdx, &0u32);
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
         env.storage().instance().set(&DataKey::UpfrontReleased, &false);
+        extend_instance_ttl(&env);
     }
 
     pub fn fund(env: Env, client: Address, max_xlm_to_spend: i128) {
@@ -330,6 +339,7 @@ impl LikhaEscrow {
         }
         
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+        extend_instance_ttl(env);
     }
 
     pub fn request_mediation(env: Env, caller: Address) {
@@ -347,6 +357,7 @@ impl LikhaEscrow {
         
         env.storage().instance().set(&DataKey::Milestones, &milestones);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Disputed);
+        set_interaction(&env);
     }
 
     pub fn escalate_to_mediator(env: Env, caller: Address) {
@@ -411,6 +422,7 @@ impl LikhaEscrow {
 
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+        extend_instance_ttl(&env);
     }
 
     pub fn reject_dispute_split(env: Env, caller: Address) {
@@ -435,6 +447,7 @@ impl LikhaEscrow {
 
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+        extend_instance_ttl(&env);
     }
 
     pub fn claim_dispute_timeout(env: Env, caller: Address) {
@@ -470,6 +483,7 @@ impl LikhaEscrow {
 
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+        extend_instance_ttl(&env);
     }
 
     pub fn resolve_dispute(
@@ -547,6 +561,7 @@ impl LikhaEscrow {
         check_status(&env, EscrowStatus::Unfunded);
 
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+        extend_instance_ttl(&env);
     }
 
     pub fn client_cancel_with_kill_fee(env: Env, client: Address) {
