@@ -121,7 +121,6 @@ async function initializeEscrowContract(
   contractId: string,
   clientAddress: string,
   freelancerAddress: string,
-  upfrontAmountUsd: number,
   paidRevisionPriceUsd: number,
   milestones: { payout_amount_usd: number; max_revisions: number }[]
 ): Promise<void> {
@@ -135,7 +134,6 @@ async function initializeEscrowContract(
       new Address(ORACLE_ID).toScVal(),
       new Address(DEFAULT_MEDIATOR).toScVal(),
       new Address(PLATFORM_TREASURY).toScVal(),
-      nativeToScVal(BigInt(upfrontAmountUsd), { type: 'i128' }),
       nativeToScVal(BigInt(paidRevisionPriceUsd), { type: 'i128' }),
       buildMilestonesScVal(milestones)
     ));
@@ -146,7 +144,6 @@ async function initializeEscrowContract(
 export async function deployAndInitializeEscrow(
   clientAddress: string,
   freelancerAddress: string,
-  upfrontAmountUsd: number, 
   paidRevisionPriceUsd: number, 
   milestones: { payout_amount_usd: number; max_revisions: number }[]
 ): Promise<string> {
@@ -158,7 +155,7 @@ export async function deployAndInitializeEscrow(
   if (!contractId) {
     throw new Error('Failed to parse contract ID from deployment metadata.');
   }
-  await initializeEscrowContract(contractId, clientAddress, freelancerAddress, upfrontAmountUsd, paidRevisionPriceUsd, milestones);
+  await initializeEscrowContract(contractId, clientAddress, freelancerAddress, paidRevisionPriceUsd, milestones);
   return contractId;
 }
 
@@ -375,31 +372,14 @@ export async function claimRefundTimeout(contractId: string, clientAddress: stri
   return submitTransaction(txBuilder);
 }
 
-export async function releaseUpfront(contractId: string, clientAddress: string) {
-  const account = await server.getAccount(clientAddress);
+export async function freelancerCancel(contractId: string, freelancerAddress: string) {
+  const account = await server.getAccount(freelancerAddress);
   const contract = new Contract(contractId);
   
   const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
-    .addOperation(contract.call('release_upfront', new Address(clientAddress).toScVal()));
+    .addOperation(contract.call('freelancer_cancel', new Address(freelancerAddress).toScVal()));
 
   return submitTransaction(txBuilder);
-}
-
-export async function isUpfrontReleased(contractId: string, clientAddress: string): Promise<boolean> {
-  try {
-    const account = await server.getAccount(clientAddress);
-    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
-      .addOperation(new Contract(contractId).call('is_upfront_released'))
-      .setTimeout(30).build();
-    const sim = await server.simulateTransaction(tx);
-    if (rpc.Api.isSimulationSuccess(sim) && sim.result) {
-      const val = sim.result.retval;
-      return val.switch() === xdr.ScValType.scvBool() && val.b();
-    }
-  } catch (e) {
-    console.error('Failed to query isUpfrontReleased:', e);
-  }
-  return false;
 }
 
 export async function getLockedBalance(contractId: string, callerAddress: string): Promise<bigint> {

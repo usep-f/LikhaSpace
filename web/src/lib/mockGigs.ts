@@ -35,7 +35,6 @@ export interface Gig {
   category: 'music' | 'design' | 'dev' | 'copywriting';
   description: string;
   priceUSD: number;
-  upfrontPercentage: number;
   tags: string[];
   status: 'active' | 'occupied' | 'paused'; // active = visible, occupied = working on it, paused = hidden by user
   rating?: number; // average rating specifically for this gig
@@ -57,7 +56,6 @@ export interface Order {
   freelancerAddress: string;
   status: 'pending_acceptance' | 'denied' | 'awaiting_funding' | 'escrow_funded' | 'delivered' | 'completed' | 'disputed' | 'settled_dispute' | 'mediation';
   priceUSD: number;
-  upfrontPercentage: number;
   denialMessage?: string;
   proposalText?: string;
   milestones?: MilestoneConfig[];
@@ -76,7 +74,6 @@ export interface Order {
 
   // On-Chain Verification
   txHash?: string;
-  upfrontReleased?: boolean;
 
   // Rating/Review for completed orders
   review?: {

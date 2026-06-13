@@ -52,7 +52,6 @@ pub struct EscrowConfig {
     pub oracle: Address,
     pub mediator: Address,
     pub treasury: Address,
-    pub upfront_amount_usd: i128,
     pub paid_revision_price_usd: i128,
 }
 
@@ -74,7 +73,6 @@ pub enum DataKey {
     LastInteractionTimestamp,
     LockedXlmBalance, // Stroops locked
     StroopsPerCent, // Stored oracle conversion rate at funding
-    UpfrontReleased,
     DisputeProposal,
 }
 
@@ -137,7 +135,6 @@ impl LikhaEscrow {
         oracle: Address,
         mediator: Address,
         treasury: Address,
-        upfront_amount_usd: i128,
         paid_revision_price_usd: i128,
         milestones: Vec<Milestone>,
     ) {
@@ -151,7 +148,6 @@ impl LikhaEscrow {
             oracle,
             mediator,
             treasury,
-            upfront_amount_usd,
             paid_revision_price_usd,
         };
 
@@ -160,7 +156,6 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::Milestones, &milestones);
         env.storage().instance().set(&DataKey::CurrentMilestoneIdx, &0u32);
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
-        env.storage().instance().set(&DataKey::UpfrontReleased, &false);
         extend_instance_ttl(&env);
     }
 
@@ -171,12 +166,10 @@ impl LikhaEscrow {
         check_status(&env, EscrowStatus::Unfunded);
 
         let milestones: Vec<Milestone> = env.storage().instance().get(&DataKey::Milestones).unwrap();
-        let mut total_milestone_usd = 0;
+        let mut total_usd = 0;
         for m in milestones.iter() {
-            total_milestone_usd += m.payout_amount_usd;
+            total_usd += m.payout_amount_usd;
         }
-
-        let total_usd = config.upfront_amount_usd + total_milestone_usd;
 
         // Oracle returns how many XLM stroops equals 1 USD cent.
         let stroops_per_cent: i128 = get_stroops_per_cent(&env, &config.oracle);
@@ -191,7 +184,6 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::LockedXlmBalance, &locked_xlm);
         env.storage().instance().set(&DataKey::StroopsPerCent, &stroops_per_cent);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Funded);
-        env.storage().instance().set(&DataKey::UpfrontReleased, &false);
         
         let mut new_milestones = milestones;
         if new_milestones.len() > 0 {
@@ -570,38 +562,40 @@ impl LikhaEscrow {
         client.require_auth();
         check_status(&env, EscrowStatus::Funded);
 
-        Self::internal_refund_all_to_client(&env);
-    }
+        let idx: u32 = env.storage().instance().get(&DataKey::CurrentMilestoneIdx).unwrap();
+        let milestones: Vec<Milestone> = env.storage().instance().get(&DataKey::Milestones).unwrap();
+        
+        let mut locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
+        let token_client = token::Client::new(&env, &config.token);
 
-    pub fn release_upfront(env: Env, client: Address) {
-        let config = get_config(&env);
-        assert_eq!(client, config.client, "Only client can release upfront");
-        client.require_auth();
-        check_status(&env, EscrowStatus::Funded);
+        if idx < milestones.len() as u32 {
+            let m = milestones.get(idx).unwrap();
+            let stroops_per_cent: i128 = env.storage().instance().get(&DataKey::StroopsPerCent).unwrap();
+            let payout_xlm = m.payout_amount_usd * stroops_per_cent;
+            let kill_fee_xlm = (payout_xlm * 75) / 100;
 
-        let upfront_released: bool = env.storage().instance().get(&DataKey::UpfrontReleased).unwrap_or(false);
-        assert!(!upfront_released, "Upfront already released");
-
-        let stroops_per_cent: i128 = env.storage().instance().get(&DataKey::StroopsPerCent).unwrap();
-        let upfront_xlm = config.upfront_amount_usd * stroops_per_cent;
-
-        if upfront_xlm > 0 {
-            let mut locked_xlm: i128 = env.storage().instance().get(&DataKey::LockedXlmBalance).unwrap();
-            assert!(locked_xlm >= upfront_xlm, "Insufficient locked balance");
-
-            let token_client = token::Client::new(&env, &config.token);
-            token_client.transfer(&env.current_contract_address(), &config.freelancer, &upfront_xlm);
-
-            locked_xlm -= upfront_xlm;
-            env.storage().instance().set(&DataKey::LockedXlmBalance, &locked_xlm);
+            if locked_xlm >= kill_fee_xlm && kill_fee_xlm > 0 {
+                token_client.transfer(&env.current_contract_address(), &config.freelancer, &kill_fee_xlm);
+                locked_xlm -= kill_fee_xlm;
+            }
         }
 
-        env.storage().instance().set(&DataKey::UpfrontReleased, &true);
-        set_interaction(&env);
+        if locked_xlm > 0 {
+            token_client.transfer(&env.current_contract_address(), &config.client, &locked_xlm);
+        }
+
+        env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
+        env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
+        extend_instance_ttl(&env);
     }
 
-    pub fn is_upfront_released(env: Env) -> bool {
-        env.storage().instance().get(&DataKey::UpfrontReleased).unwrap_or(false)
+    pub fn freelancer_cancel(env: Env, freelancer: Address) {
+        let config = get_config(&env);
+        assert_eq!(freelancer, config.freelancer, "Only freelancer");
+        freelancer.require_auth();
+        check_status(&env, EscrowStatus::Funded);
+
+        Self::internal_refund_all_to_client(&env);
     }
 
     pub fn get_config(env: Env) -> EscrowConfig {
