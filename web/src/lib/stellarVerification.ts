@@ -1,3 +1,6 @@
+import { Horizon } from '@stellar/stellar-sdk';
+import { HORIZON_URL } from './stellar';
+
 export interface WalletStats {
   balanceXLM: number;
   accountAgeDays: number;
@@ -18,25 +21,54 @@ export const DEFAULT_RULES: VerificationRules = {
 };
 
 /**
- * Mocks fetching on-chain stats for a wallet address.
- * In production, this would query Horizon API or Stellar RPC.
+ * Fetches live on-chain stats for a wallet address using Stellar Horizon.
  */
 export async function fetchWalletStats(address: string): Promise<WalletStats> {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  // If the user's address is an empty string, fail
   if (!address) {
     throw new Error('No address provided');
   }
 
-  // Mock returning valid stats for any address (to allow testing)
-  // In a real app, if the address doesn't exist on-chain, it would return error.
-  return {
-    balanceXLM: 15.5,
-    accountAgeDays: 14,
-    totalTransactions: 3,
-  };
+  try {
+    const horizon = new Horizon.Server(HORIZON_URL);
+    
+    // 1. Fetch account balance
+    const accountInfo = await horizon.loadAccount(address);
+    const native = accountInfo.balances.find((b) => b.asset_type === 'native');
+    const balanceXLM = native ? parseFloat(native.balance) : 0;
+
+    // 2. Fetch the very first transaction to determine account age
+    const oldestTxs = await horizon.transactions().forAccount(address).order('asc').limit(1).call();
+    let accountAgeDays = 0;
+    if (oldestTxs.records && oldestTxs.records.length > 0) {
+      const createdAt = new Date(oldestTxs.records[0].created_at);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - createdAt.getTime());
+      accountAgeDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    // 3. Fetch recent transactions to get a transaction count (up to 200)
+    const recentTxs = await horizon.transactions().forAccount(address).order('desc').limit(200).call();
+    const totalTransactions = recentTxs.records ? recentTxs.records.length : 0;
+
+    return {
+      balanceXLM,
+      accountAgeDays,
+      totalTransactions,
+    };
+  } catch (error: unknown) {
+    // If the account does not exist on the network (e.g. 404 Not Found), it's completely unfunded.
+    const errObj = error as Record<string, unknown>;
+    const is404 = errObj?.response && (errObj.response as Record<string, unknown>).status === 404;
+    if (is404) {
+      return {
+        balanceXLM: 0,
+        accountAgeDays: 0,
+        totalTransactions: 0,
+      };
+    }
+    console.error('Error fetching wallet stats:', error);
+    throw new Error('Failed to fetch wallet stats from the Stellar network.');
+  }
 }
 
 /**

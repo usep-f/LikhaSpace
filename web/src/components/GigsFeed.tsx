@@ -75,11 +75,8 @@ const GigCard: React.FC<CardProps> = ({ gig,  onBookClick, onProfileClick }) => 
 
         <div className="flex items-center justify-between pt-2">
           <div>
-            <p className="text-sm font-bold text-white font-heading mt-0.5 flex items-center gap-2">
+            <p className="text-sm font-bold text-white font-heading mt-0.5">
               ${gig.priceUSD}
-              <span className="text-[10px] uppercase tracking-wider text-gray-500">
-                ({gig.upfrontPercentage}% Upfront)
-              </span>
             </p>
           </div>
           <button

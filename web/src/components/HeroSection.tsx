@@ -4,6 +4,7 @@ import React from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { Search, ArrowRight, ShieldCheck, Coins, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { LivePriceCard } from './ui/LivePriceCard';
 
 // Sub-component: Escrow Flow Chart Diagram (Right side)
 const EscrowFlowMockup: React.FC = () => (
@@ -31,15 +32,15 @@ const EscrowFlowMockup: React.FC = () => (
         </div>
       </div>
 
-      <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-lg border border-white/5">
-        <div className="w-8 h-8 rounded-full bg-hotpink/10 border border-hotpink/40 flex items-center justify-center">
-          <Send className="w-4 h-4 text-hotpink" />
+        <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
+          <div className="w-8 h-8 rounded-full bg-hotpink/10 border border-hotpink/40 flex items-center justify-center">
+            <Send className="w-4 h-4 text-hotpink" />
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Step 2: Milestone Funding</p>
+            <p className="text-xs text-white">Funds are locked in escrow and paid out on delivery</p>
+          </div>
         </div>
-        <div className="text-left">
-          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Step 2: Upfront Release</p>
-          <p className="text-xs text-white">Upfront payment (0% - 50%) dispatched instantly</p>
-        </div>
-      </div>
 
       <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-lg border border-white/5">
         <div className="w-8 h-8 rounded-full bg-neongreen/10 border border-neongreen/40 flex items-center justify-center">
@@ -197,10 +198,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ searchVal, onSearchCha
           />
         </div>
 
-        <div className="lg:col-span-5 w-full flex justify-center">
+        <div className="lg:col-span-5 w-full flex flex-col items-center gap-4">
           <div className="w-full max-w-md">
             <EscrowFlowMockup />
           </div>
+          <LivePriceCard />
         </div>
       </div>
     </section>

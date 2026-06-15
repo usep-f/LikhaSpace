@@ -14,7 +14,8 @@ import { ChatModal } from '@/components/ChatModal';
 import { StatusModal } from '@/components/StatusModal';
 import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 import { DisputeModal } from '@/components/DisputeModal';
-import { refundRemaining, cancelUnfunded, requestMediation } from '@/lib/contract';
+import { freelancerCancel, cancelUnfunded, requestMediation } from '@/lib/contract';
+import { profileSettingsSchema, denialMessageSchema, sanitizeInput } from '@/lib/validation';
 
 function getStatusBadge(order: Order) {
   if (order.status === 'pending_acceptance') return { text: 'Pending Acceptance', classes: 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' };
@@ -137,7 +138,6 @@ const ListingsView: React.FC = () => {
         category: updatedGig.category || 'design',
         description: updatedGig.description || '',
         priceUSD: updatedGig.priceUSD || 100,
-        upfrontPercentage: updatedGig.upfrontPercentage || 20,
         tags: updatedGig.tags || [],
         status: updatedGig.status || 'active',
         milestones: updatedGig.milestones || [],
@@ -279,6 +279,32 @@ const OrdersView: React.FC = () => {
     }
   };
 
+  const handleDenyRequest = async (orderId: string) => {
+    try {
+      showLoading('Declining booking request...');
+      let msg = denyMsgs[orderId] || '';
+      
+      // Zod Validation & Sanitization
+      const parsed = denialMessageSchema.safeParse({ message: msg });
+      if (!parsed.success) {
+        throw new Error(parsed.error.issues[0].message);
+      }
+      msg = sanitizeInput(parsed.data.message || '');
+
+      await updateOrderStatus(orderId, { 
+        status: 'denied',
+        denialMessage: msg
+      });
+      setShowDenyInput({ ...showDenyInput, [orderId]: false });
+      showToast('Booking request declined.', 'success');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      showToast(`Error declining booking: ${msg}`, 'error');
+    } finally {
+      hideLoading();
+    }
+  };
+
   const handleCancelUnfunded = async (order: Order) => {
     showConfirm(
       'Cancel Booking Request',
@@ -321,7 +347,7 @@ const OrdersView: React.FC = () => {
         if (!address || !order.txHash) return showToast('Missing contract or wallet data', 'error');
         try {
           showLoading('Canceling project and refunding client on-chain...');
-          await refundRemaining(order.txHash, address);
+          await freelancerCancel(order.txHash, address);
 
           const newChangelog = {
             id: crypto.randomUUID(),
@@ -410,7 +436,7 @@ const OrdersView: React.FC = () => {
                    </p>
                  </div>
                  <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
-                 <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} • Upfront: {order.upfrontPercentage}%</p>
+                 <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
                </div>
 
                <div className="flex-1 w-full flex flex-col justify-end items-end gap-2">
@@ -419,90 +445,147 @@ const OrdersView: React.FC = () => {
                      {getStatusBadge(order).text}
                    </span>
                  </div>
-                 {order.status === 'pending_acceptance' ? (
-                   !showDenyInput[order.id] ? (
-                     <div className="flex gap-2 flex-wrap justify-end">
-                       <button
-                         title="View Proposal"
-                         onClick={() => setActiveProposalOrder(order)}
-                         className="p-2.5 rounded bg-neoncyan/10 border border-neoncyan/30 text-neoncyan hover:bg-neoncyan/20 transition-all cursor-pointer"
-                       >
-                         <Eye className="w-5 h-5" />
-                       </button>
-                       <button
-                         title="Accept Request"
-                         onClick={() => handleAcceptBooking(order.id)}
-                         className="p-2.5 rounded bg-neongreen text-obsidian hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all cursor-pointer"
-                       >
-                         <Check className="w-5 h-5" />
-                       </button>
-                       <button
-                         title="Deny Request"
-                         onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: true })}
-                         className="p-2.5 rounded bg-white/5 text-white hover:bg-white/10 transition-colors cursor-pointer"
-                       >
-                         <X className="w-5 h-5" />
-                       </button>
-                     </div>
-                   ) : (
-                     <div className="w-full space-y-2 max-w-xs">
-                       <textarea
-                         value={denyMsgs[order.id] || ''}
-                         onChange={(e) => setDenyMsgs({ ...denyMsgs, [order.id]: e.target.value })}
-                         placeholder="Reason for declining (Optional)..."
-                         className="w-full bg-obsidian border border-white/10 rounded-lg p-2 text-xs text-white resize-none h-16"
-                       />
-                       <div className="flex justify-end gap-2">
-                         <button onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: false })} className="px-3 py-1.5 rounded text-gray-400 text-xs hover:text-white cursor-pointer">Cancel</button>
-                         <button className="px-3 py-1.5 rounded bg-hotpink text-white font-bold text-xs cursor-pointer">Confirm Decline</button>
-                       </div>
-                     </div>
-                   )
-                 ) : (
+                 {showDenyInput[order.id] ? (
+                    <div className="w-full space-y-2 max-w-xs">
+                      <textarea
+                        value={denyMsgs[order.id] || ''}
+                        onChange={(e) => setDenyMsgs({ ...denyMsgs, [order.id]: e.target.value })}
+                        placeholder="Reason for declining (Optional)..."
+                        className="w-full bg-obsidian border border-white/10 rounded-lg p-2 text-xs text-white resize-none h-16"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: false })} className="px-3 py-1.5 rounded text-gray-400 text-xs hover:text-white cursor-pointer">Cancel</button>
+                        <button onClick={() => handleDenyRequest(order.id)} className="px-3 py-1.5 rounded bg-hotpink text-white font-bold text-xs cursor-pointer">Confirm Decline</button>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="flex gap-2 flex-wrap justify-end">
-                      {order.status === 'awaiting_funding' && (
-                        <button
-                          title="Cancel Request"
-                          onClick={() => handleCancelUnfunded(order)}
-                          className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      )}
-                      {order.status === 'escrow_funded' && (
-                        <>
-                          <button
-                            title="Submit Deliverables"
-                            onClick={() => setActiveSubmitOrder(order)}
-                            className="p-2.5 rounded bg-neoncyan border border-neoncyan/30 text-obsidian hover:bg-neoncyan/80 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,255,255,0.4)]"
-                          >
-                            <UploadCloud className="w-5 h-5" />
-                          </button>
-                          <button
-                            title="Dispute Project"
-                            onClick={() => handleDisputeProject(order)}
-                            className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
-                          >
-                            <ShieldAlert className="w-5 h-5" />
-                          </button>
-                          <button
-                            title="Cancel Project (Refund)"
-                            onClick={() => handleCancelFunded(order)}
-                            className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                        </>
-                      )}
-                      {(order.status === 'disputed' || order.status === 'mediation') && (
-                        <button
-                          title="Dispute Panel"
-                          onClick={() => setActiveDisputeOrder(order)}
-                          className="p-2.5 rounded bg-yellow-500/20 border border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)] font-bold text-xs uppercase tracking-wider px-4 py-2"
-                        >
-                          Dispute Panel
-                        </button>
-                      )}
+                      {/* View Proposal */}
+                      <button
+                        title={
+                          order.status === 'pending_acceptance'
+                            ? "View Proposal"
+                            : "View Proposal (Only for pending bookings)"
+                        }
+                        disabled={order.status !== 'pending_acceptance'}
+                        onClick={() => setActiveProposalOrder(order)}
+                        className={`p-2.5 rounded border transition-all ${
+                          order.status === 'pending_acceptance'
+                            ? "bg-neoncyan/10 border-neoncyan/30 text-neoncyan hover:bg-neoncyan/20 cursor-pointer"
+                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        <Eye className="w-5 h-5" />
+                      </button>
+
+                      {/* Accept Request */}
+                      <button
+                        title={
+                          order.status === 'pending_acceptance'
+                            ? "Accept Request"
+                            : "Accept Request (Only for pending bookings)"
+                        }
+                        disabled={order.status !== 'pending_acceptance'}
+                        onClick={() => handleAcceptBooking(order.id)}
+                        className={`p-2.5 rounded transition-all ${
+                          order.status === 'pending_acceptance'
+                            ? "bg-neongreen text-obsidian hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] cursor-pointer"
+                            : "bg-gray-500/10 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        <Check className="w-5 h-5" />
+                      </button>
+
+                      {/* Submit Deliverables */}
+                      <button
+                        title={
+                          order.status === 'escrow_funded'
+                            ? "Submit Deliverables"
+                            : "Submit Deliverables (Only for active funded projects)"
+                        }
+                        disabled={order.status !== 'escrow_funded'}
+                        onClick={() => setActiveSubmitOrder(order)}
+                        className={`p-2.5 rounded border transition-all ${
+                          order.status === 'escrow_funded'
+                            ? "bg-neoncyan border border-neoncyan/30 text-obsidian hover:bg-neoncyan/80 shadow-[0_0_10px_rgba(0,255,255,0.4)] cursor-pointer"
+                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        <UploadCloud className="w-5 h-5" />
+                      </button>
+
+                      {/* Dispute Project */}
+                      <button
+                        title={
+                          order.status === 'escrow_funded'
+                            ? order.hasSubmittedOnce
+                              ? "Dispute Project"
+                              : "Dispute (Locked until first submission)"
+                            : "Dispute Project (Only for active funded projects)"
+                        }
+                        disabled={order.status !== 'escrow_funded' || !order.hasSubmittedOnce}
+                        onClick={() => handleDisputeProject(order)}
+                        className={`p-2.5 rounded border transition-colors ${
+                          (order.status === 'escrow_funded' && order.hasSubmittedOnce)
+                            ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        <ShieldAlert className="w-5 h-5" />
+                      </button>
+
+                      {/* Cancel / Deny / Refund Request */}
+                      <button
+                        title={
+                          order.status === 'pending_acceptance'
+                            ? "Deny Request"
+                            : order.status === 'awaiting_funding'
+                            ? "Cancel Request"
+                            : order.status === 'escrow_funded'
+                            ? "Cancel Project (Refund)"
+                            : "Cancel/Deny (Unavailable)"
+                        }
+                        disabled={
+                          order.status !== 'pending_acceptance' &&
+                          order.status !== 'awaiting_funding' &&
+                          order.status !== 'escrow_funded'
+                        }
+                        onClick={() => {
+                          if (order.status === 'pending_acceptance') {
+                            setShowDenyInput({ ...showDenyInput, [order.id]: true });
+                          } else if (order.status === 'awaiting_funding') {
+                            handleCancelUnfunded(order);
+                          } else if (order.status === 'escrow_funded') {
+                            handleCancelFunded(order);
+                          }
+                        }}
+                        className={`p-2.5 rounded border transition-colors ${
+                          (order.status === 'pending_acceptance' || order.status === 'awaiting_funding' || order.status === 'escrow_funded')
+                            ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer"
+                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+
+                      {/* Dispute Panel */}
+                      <button
+                        title={
+                          (order.status === 'disputed' || order.status === 'mediation')
+                            ? "Dispute Panel"
+                            : "Dispute Panel (Only when project is in dispute)"
+                        }
+                        disabled={order.status !== 'disputed' && order.status !== 'mediation'}
+                        onClick={() => setActiveDisputeOrder(order)}
+                        className={`p-2.5 rounded transition-colors font-bold text-xs uppercase tracking-wider px-4 py-2 border ${
+                          (order.status === 'disputed' || order.status === 'mediation')
+                            ? "bg-yellow-500/20 border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        Dispute Panel
+                      </button>
+
                       <button
                         title="Message"
                         onClick={() => setActiveChatOrder(order)}
@@ -518,7 +601,7 @@ const OrdersView: React.FC = () => {
                         <Activity className="w-5 h-5" />
                       </button>
                     </div>
-                 )}
+                  )}
                </div>
             </div>
           ))
@@ -662,18 +745,43 @@ const ProfileSettingsView: React.FC = () => {
     portfolio: userProfile?.portfolio || '',
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (errors[e.target.name]) {
+      setErrors({ ...errors, [e.target.name]: '' });
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+    
+    const parsed = profileSettingsSchema.safeParse(formData);
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {};
+      parsed.error.issues.forEach(err => {
+        if (err.path[0]) fieldErrors[err.path[0].toString()] = err.message;
+      });
+      setErrors(fieldErrors);
+      showToast('Please fix the errors in the form.', 'error');
+      return;
+    }
+
     try {
       showLoading('Saving profile...');
-      await registerProfile(formData);
+      const sanitizedData = {
+        ...parsed.data,
+        bio: sanitizeInput(parsed.data.bio || ''),
+        title: sanitizeInput(parsed.data.title || ''),
+        name: sanitizeInput(parsed.data.name),
+      };
+      await registerProfile(sanitizedData);
       showToast('Profile updated successfully!', 'success');
     } catch (err) {
       console.error(err);
+      showToast('Failed to update profile.', 'error');
     } finally {
       hideLoading();
     }
@@ -702,22 +810,27 @@ const ProfileSettingsView: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
           <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
           <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Phone</label>
           <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Professional Title</label>
           <input type="text" name="title" value={formData.title} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.title && <p className="text-red-400 text-xs mt-1">{errors.title}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Bio</label>
           <textarea name="bio" value={formData.bio} onChange={handleChange} rows={3} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.bio && <p className="text-red-400 text-xs mt-1">{errors.bio}</p>}
         </div>
         <div className="flex justify-between pt-4 mt-4 border-t border-white/5">
           <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-500/10 text-red-400 font-bold text-sm rounded hover:bg-red-500/20 transition-colors">

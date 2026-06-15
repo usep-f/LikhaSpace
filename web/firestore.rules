@@ -1,20 +1,59 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ───────────────────────────────────────────────
+    // USERS
+    // ───────────────────────────────────────────────
     match /users/{userId} {
-      // Allow anyone to read profiles (e.g. to view freelancers and client details)
+      // Anyone can read public profiles (for marketplace browsing)
       allow read: if true;
-      
-      // Allow writes to the user document for registration, updates, and soft deletion
-      allow write: if true;
+
+      // Only the authenticated wallet owner can write to their own document.
+      // request.auth.uid === Stellar public key (set by Firebase Custom Token).
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
-    
+
+    // ───────────────────────────────────────────────
+    // GIGS
+    // ───────────────────────────────────────────────
     match /gigs/{gigId} {
-      allow read, write: if true;
+      // Anyone can browse gigs
+      allow read: if true;
+
+      // Only authenticated users can create a gig
+      allow create: if request.auth != null
+        && request.resource.data.freelancerAddress == request.auth.uid;
+
+      // Only the gig owner (freelancer) can update or delete their own gig
+      allow update, delete: if request.auth != null
+        && resource.data.freelancerAddress == request.auth.uid;
     }
-    
+
+    // ───────────────────────────────────────────────
+    // ORDERS
+    // ───────────────────────────────────────────────
     match /orders/{orderId} {
-      allow read, write: if true;
+      // Only order participants or a mediator can read
+      allow read: if request.auth != null
+        && (resource.data.clientAddress == request.auth.uid
+         || resource.data.freelancerAddress == request.auth.uid
+         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mediator');
+
+      // Only an authenticated client can create an order (they are the buyer)
+      allow create: if request.auth != null
+        && request.resource.data.clientAddress == request.auth.uid;
+
+      // Only the client, freelancer, or mediator can update it, and they can only modify specific mutable fields
+      allow update: if request.auth != null
+        && (resource.data.clientAddress == request.auth.uid
+         || resource.data.freelancerAddress == request.auth.uid
+         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mediator')
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'changelogs', 'chatMessages', 'currentMilestoneIdx', 'milestones', 'denialMessage', 'txHash', 'progressPercentage', 'review', 'hasSubmittedOnce']);
+
+      // Deletion not permitted — orders are permanent audit records
+      allow delete: if false;
     }
   }
 }

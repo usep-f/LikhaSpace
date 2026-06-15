@@ -21,6 +21,7 @@ export const TESTNET_XLM = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHG
 
 // Mock Mediator logic: In a real app this would come from Firebase
 export const DEFAULT_MEDIATOR = process.env.NEXT_PUBLIC_MEDIATOR_ADDRESS || 'GAFBCLO24QMPVXFZJHVLRG6CKAGBJEMCW57UG45SS7PQ2LGMZTGY7DGX';
+export const PLATFORM_TREASURY = 'GC6QMW4WWFBXWZWLBIZ33PYWVXQGQYN3L7MBJ5BZTGT7UWJ5CHBSL3FU';
 
 export async function getOraclePrice(): Promise<number> {
   try {
@@ -63,10 +64,11 @@ export async function getOraclePrice(): Promise<number> {
         }
       }
     }
+    throw new Error('Simulation failed to retrieve price from oracle');
   } catch (e) {
     console.error('Failed to fetch oracle price:', e);
+    throw e;
   }
-  return 10000;
 }
 
 export async function getRequiredXlmForGig(priceUSD: number): Promise<number> {
@@ -120,7 +122,6 @@ async function initializeEscrowContract(
   contractId: string,
   clientAddress: string,
   freelancerAddress: string,
-  upfrontAmountUsd: number,
   paidRevisionPriceUsd: number,
   milestones: { payout_amount_usd: number; max_revisions: number }[]
 ): Promise<void> {
@@ -133,11 +134,9 @@ async function initializeEscrowContract(
       new Address(TESTNET_XLM).toScVal(),
       new Address(ORACLE_ID).toScVal(),
       new Address(DEFAULT_MEDIATOR).toScVal(),
-      nativeToScVal(BigInt(upfrontAmountUsd), { type: 'i128' }),
+      new Address(PLATFORM_TREASURY).toScVal(),
       nativeToScVal(BigInt(paidRevisionPriceUsd), { type: 'i128' }),
-      buildMilestonesScVal(milestones),
-      nativeToScVal(BigInt(1209600), { type: 'u64' }),
-      nativeToScVal(BigInt(2592000), { type: 'u64' })
+      buildMilestonesScVal(milestones)
     ));
 
   await submitTransaction(initTxBuilder);
@@ -146,7 +145,6 @@ async function initializeEscrowContract(
 export async function deployAndInitializeEscrow(
   clientAddress: string,
   freelancerAddress: string,
-  upfrontAmountUsd: number, 
   paidRevisionPriceUsd: number, 
   milestones: { payout_amount_usd: number; max_revisions: number }[]
 ): Promise<string> {
@@ -158,7 +156,7 @@ export async function deployAndInitializeEscrow(
   if (!contractId) {
     throw new Error('Failed to parse contract ID from deployment metadata.');
   }
-  await initializeEscrowContract(contractId, clientAddress, freelancerAddress, upfrontAmountUsd, paidRevisionPriceUsd, milestones);
+  await initializeEscrowContract(contractId, clientAddress, freelancerAddress, paidRevisionPriceUsd, milestones);
   return contractId;
 }
 
@@ -375,31 +373,14 @@ export async function claimRefundTimeout(contractId: string, clientAddress: stri
   return submitTransaction(txBuilder);
 }
 
-export async function releaseUpfront(contractId: string, clientAddress: string) {
-  const account = await server.getAccount(clientAddress);
+export async function freelancerCancel(contractId: string, freelancerAddress: string) {
+  const account = await server.getAccount(freelancerAddress);
   const contract = new Contract(contractId);
   
   const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
-    .addOperation(contract.call('release_upfront', new Address(clientAddress).toScVal()));
+    .addOperation(contract.call('freelancer_cancel', new Address(freelancerAddress).toScVal()));
 
   return submitTransaction(txBuilder);
-}
-
-export async function isUpfrontReleased(contractId: string, clientAddress: string): Promise<boolean> {
-  try {
-    const account = await server.getAccount(clientAddress);
-    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
-      .addOperation(new Contract(contractId).call('is_upfront_released'))
-      .setTimeout(30).build();
-    const sim = await server.simulateTransaction(tx);
-    if (rpc.Api.isSimulationSuccess(sim) && sim.result) {
-      const val = sim.result.retval;
-      return val.switch() === xdr.ScValType.scvBool() && val.b();
-    }
-  } catch (e) {
-    console.error('Failed to query isUpfrontReleased:', e);
-  }
-  return false;
 }
 
 export async function getLockedBalance(contractId: string, callerAddress: string): Promise<bigint> {
@@ -416,6 +397,22 @@ export async function getLockedBalance(contractId: string, callerAddress: string
     console.error('Failed to query getLockedBalance:', e);
   }
   return BigInt(0);
+}
+
+export async function getHasSubmittedOnce(contractId: string, callerAddress: string): Promise<boolean> {
+  try {
+    const account = await server.getAccount(callerAddress);
+    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
+      .addOperation(new Contract(contractId).call('get_has_submitted_once'))
+      .setTimeout(30).build();
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationSuccess(sim) && sim.result) {
+      return scValToNative(sim.result.retval) as boolean;
+    }
+  } catch (e) {
+    console.error('Failed to query getHasSubmittedOnce:', e);
+  }
+  return false;
 }
 
 export async function resolveDispute(

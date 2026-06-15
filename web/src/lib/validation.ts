@@ -73,3 +73,46 @@ export const onboardingSchema = z.object({
 });
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
+
+// Profile Settings Schema (same as onboarding but without role requirement)
+export const profileSettingsSchema = onboardingSchema.omit({ role: true });
+
+// Gig Listing Schema
+export const gigSchema = z.object({
+  title: z.string().trim().min(5, 'Title must be at least 5 characters').max(100, 'Title must not exceed 100 characters'),
+  category: z.enum(['design', 'dev', 'music', 'copywriting']),
+  description: z.string().trim().min(10, 'Description must be at least 10 characters').max(2000, 'Description is too long'),
+  priceUSD: z.number().min(1, 'Price must be at least $1'),
+  tags: z.array(z.string().trim().max(30)).max(10, 'Maximum 10 tags allowed'),
+  status: z.enum(['active', 'paused', 'occupied']),
+  milestones: z.array(z.object({
+    title: z.string().trim().min(1, 'Milestone title is required').max(100),
+    payoutUSD: z.number().min(1, 'Payout must be at least $1'),
+    maxRevisions: z.number().min(0, 'Revisions cannot be negative'),
+  })).max(10, 'Maximum 10 milestones allowed'),
+}).refine(data => {
+  if (data.milestones.length === 0) return true;
+  const totalAllocated = data.milestones.reduce((acc, m) => acc + m.payoutUSD, 0);
+  return Math.abs(totalAllocated - data.priceUSD) < 0.01;
+}, {
+  message: 'The sum of all milestone payouts must exactly equal the total price.',
+  path: ['milestones'], // Attach error to the milestones array
+});
+
+export type GigInput = z.infer<typeof gigSchema>;
+
+// Booking Message Schema
+export const bookingMessageSchema = z.object({
+  message: z.string().trim().max(1000, 'Message cannot exceed 1000 characters').optional(),
+});
+
+// Deliverable Schema
+export const deliverableSchema = z.object({
+  link: z.string().trim().url('Please enter a valid URL').or(z.literal('')).optional(),
+  notes: z.string().trim().max(2000, 'Notes cannot exceed 2000 characters').optional(),
+});
+
+// Denial Message Schema
+export const denialMessageSchema = z.object({
+  message: z.string().trim().max(1000, 'Message cannot exceed 1000 characters').optional(),
+});

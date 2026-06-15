@@ -42,7 +42,7 @@ export const ValueProps: React.FC = () => {
         
         <PropCard
           title="Soroban Escrows"
-          description="Clients deposit funds into public, audited smart contracts. Freelancers receive up to 50% upfront payouts, with the rest locked until delivery."
+          description="Clients deposit funds into public, audited smart contracts. Freelancers are protected by a 75% kill-fee, guaranteeing payment for active work."
           icon={<ShieldAlert className="w-6 h-6 text-hotpink" />}
           borderColorClass="hover:border-hotpink/40 hover:shadow-[0_0_12px_rgba(255,0,127,0.15)]"
         />

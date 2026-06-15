@@ -80,7 +80,7 @@ export const ActiveDisputesView: React.FC = () => {
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Locked Funds (Approx):</span>
                   <span className="font-bold text-yellow-500">
-                    ${(order.priceUSD * (1 - order.upfrontPercentage / 100)).toFixed(2)} USD
+                    ${order.priceUSD.toFixed(2)} USD
                   </span>
                 </div>
               </div>
