@@ -10,6 +10,8 @@ import { DeliverablesModal } from '@/components/DeliverablesModal';
 import { StatusModal } from '@/components/StatusModal';
 import { CancelModal } from '@/components/CancelModal';
 import { DisputeModal } from '@/components/DisputeModal';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
+import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
 import { subscribeToClientOrders, updateOrderStatus, getGig } from '@/lib/db';
@@ -391,7 +393,9 @@ export const ActiveProjectsView: React.FC = () => {
       {paginatedOrders.length > 0 ? (
         paginatedOrders.map(order => (
           <div key={order.id} className={`p-6 rounded-xl glass-card border flex flex-col md:flex-row justify-between items-center gap-6 ${
-            order.status === 'pending_acceptance' ? 'border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'border-white/5'
+            order.status === 'pending_acceptance' ? 'border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]' :
+            order.status === 'delivered' ? 'border-neongreen/30 shadow-[0_0_15px_rgba(57,255,20,0.1)]' :
+            'border-white/5'
           }`}>
             <div className="flex-1 w-full">
               <div className="flex items-center gap-3 mb-1">
@@ -401,9 +405,14 @@ export const ActiveProjectsView: React.FC = () => {
                   {order.status === 'pending_acceptance' ? 'Pending Acceptance' : 'Active Booking'}
                 </p>
               </div>
-              <p className="text-sm font-bold text-white flex items-center gap-1 mb-1">
-                Freelancer: {order.gigInfo?.freelancerName || order.freelancerAddress} <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
-              </p>
+              <div className="flex items-center gap-1 mb-1">
+                <UserWalletInfo
+                  address={order.freelancerAddress}
+                  role="freelancer"
+                  fallbackName={order.gigInfo?.freelancerName}
+                />
+                <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
+              </div>
               <p className="text-xs text-gray-400 mt-1">{order.gigInfo?.title}</p>
               
               <div className="bg-obsidian rounded-lg p-4 border border-white/5 max-w-sm mt-3">
@@ -424,110 +433,87 @@ export const ActiveProjectsView: React.FC = () => {
                 </span>
               </div>
 
-              <div className="flex gap-2 flex-wrap justify-end">
-                {/* Fund Escrow */}
-                <button
-                  title={
-                    order.status === 'awaiting_funding'
-                      ? "Fund Escrow"
-                      : "Fund Escrow (Only for bookings awaiting funding)"
-                  }
-                  disabled={order.status !== 'awaiting_funding'}
-                  onClick={() => handleFundEscrow(order)}
-                  className={`p-2.5 rounded border transition-colors ${
-                    order.status === 'awaiting_funding'
-                      ? "bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
-                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  <Activity className="w-5 h-5" />
-                </button>
+              <div className="flex gap-2 flex-wrap justify-end items-center">
+                {order.status === 'pending_acceptance' && (
+                  <button
+                    title="Cancel Booking"
+                    onClick={() => handleCancelUnfunded(order)}
+                    className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
 
-                {/* Dispute Project */}
-                <button
-                  title={
-                    order.status === 'escrow_funded'
-                      ? order.hasSubmittedOnce 
-                        ? "Dispute Project" 
-                        : "Dispute (Locked until first submission)"
-                      : "Dispute Project (Only for active funded projects)"
-                  }
-                  disabled={order.status !== 'escrow_funded' || !order.hasSubmittedOnce}
-                  onClick={() => handleDisputeProject(order)}
-                  className={`p-2.5 rounded border transition-colors ${
-                    (order.status === 'escrow_funded' && order.hasSubmittedOnce)
-                      ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
-                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  <ShieldAlert className="w-5 h-5" />
-                </button>
+                {order.status !== 'pending_acceptance' && (
+                  <>
+                    {order.status === 'awaiting_funding' && (
+                      <button
+                        title="Fund Escrow"
+                        onClick={() => handleFundEscrow(order)}
+                        className="p-2.5 rounded border bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)] transition-colors"
+                      >
+                        <Activity className="w-5 h-5" />
+                      </button>
+                    )}
+                    {(order.status === 'escrow_funded' || order.status === 'delivered') && (
+                      <button
+                        title="View Deliverables"
+                        onClick={() => setActiveDeliverablesOrder(order)}
+                        className="p-2.5 rounded bg-[#001a1a]/40 border border-[#00ffff]/30 text-[#00ffff] hover:bg-[#001a1a]/60 transition-all cursor-pointer"
+                      >
+                        <ExternalLink className="w-5 h-5" />
+                      </button>
+                    )}
+                    {(order.status === 'disputed' || order.status === 'mediation') && (
+                      <button
+                        title="Dispute Panel"
+                        onClick={() => setActiveDisputeOrder(order)}
+                        className="p-2.5 rounded transition-colors font-bold text-xs uppercase tracking-wider px-4 py-2 border bg-yellow-500/20 border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                      >
+                        Dispute Panel
+                      </button>
+                    )}
+                    <button
+                      title="Message"
+                      onClick={() => setActiveChatOrder(order)}
+                      className="p-2.5 rounded bg-[#141026] border border-white/10 text-white hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <MessageSquare className="w-5 h-5" />
+                    </button>
+                    <button
+                      title="View Status"
+                      onClick={() => setActiveStatusOrder(order)}
+                      className="p-2.5 rounded bg-white text-black hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
+                    >
+                      <Activity className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
 
-                {/* Cancel Booking/Project */}
-                <button
-                  title={
-                    order.status === 'awaiting_funding'
-                      ? "Cancel Booking"
-                      : order.status === 'escrow_funded'
-                      ? "Cancel Project"
-                      : "Cancel Booking/Project (Unavailable)"
-                  }
-                  disabled={order.status !== 'awaiting_funding' && order.status !== 'escrow_funded'}
-                  onClick={() => {
-                    if (order.status === 'awaiting_funding') {
-                      handleCancelUnfunded(order);
-                    } else if (order.status === 'escrow_funded') {
-                      setActiveCancelOrder(order);
-                    }
-                  }}
-                  className={`p-2.5 rounded border transition-colors ${
-                    (order.status === 'awaiting_funding' || order.status === 'escrow_funded')
-                      ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer"
-                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-
-                {/* Dispute Panel */}
-                <button
-                  title={
-                    (order.status === 'disputed' || order.status === 'mediation')
-                      ? "Dispute Panel"
-                      : "Dispute Panel (Only when project is in dispute)"
-                  }
-                  disabled={order.status !== 'disputed' && order.status !== 'mediation'}
-                  onClick={() => setActiveDisputeOrder(order)}
-                  className={`p-2.5 rounded transition-colors font-bold text-xs uppercase tracking-wider px-4 py-2 border ${
-                    (order.status === 'disputed' || order.status === 'mediation')
-                      ? "bg-yellow-500/20 border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  Dispute Panel
-                </button>
-
-                <button
-                  title="Message"
-                  onClick={() => setActiveChatOrder(order)}
-                  className="p-2.5 rounded bg-[#141026] border border-white/10 text-white hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  <MessageSquare className="w-5 h-5" />
-                </button>
-                <button
-                  title="View Deliverables"
-                  onClick={() => setActiveDeliverablesOrder(order)}
-                  className="p-2.5 rounded bg-[#001a1a]/40 border border-[#00ffff]/30 text-[#00ffff] hover:bg-[#001a1a]/60 transition-all cursor-pointer"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                </button>
-                <button
-                  title="View Status"
-                  onClick={() => setActiveStatusOrder(order)}
-                  className="p-2.5 rounded bg-white text-black hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
-                >
-                  <Activity className="w-5 h-5" />
-                </button>
+                <DropdownMenu 
+                  items={[
+                    ...(order.status === 'awaiting_funding' ? [{
+                      label: 'Cancel Booking',
+                      icon: <X className="w-4 h-4" />,
+                      destructive: true,
+                      onClick: () => handleCancelUnfunded(order)
+                    }] : []),
+                    ...((order.status === 'escrow_funded' || order.status === 'delivered') ? [
+                      {
+                        label: 'Cancel Project',
+                        icon: <X className="w-4 h-4" />,
+                        destructive: true,
+                        onClick: () => setActiveCancelOrder(order)
+                      },
+                      {
+                        label: 'Dispute Project',
+                        icon: <ShieldAlert className="w-4 h-4" />,
+                        destructive: true,
+                        onClick: () => order.hasSubmittedOnce ? handleDisputeProject(order) : showToast('Dispute locked until first submission', 'error')
+                      }
+                    ] : [])
+                  ]}
+                />
               </div>
             </div>
           </div>
