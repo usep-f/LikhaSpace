@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Gig, MilestoneConfig } from '@/lib/mockGigs';
 import { X, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { gigSchema, sanitizeInput } from '@/lib/validation';
+import { useNotification } from '@/context/NotificationContext';
 
 interface ListingModalProps {
   gig?: Gig | null; // Pass gig to edit, or null to create new
@@ -9,6 +11,7 @@ interface ListingModalProps {
 }
 
 export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave }) => {
+  const { showToast } = useNotification();
   const isEditing = !!gig;
   const isOccupied = gig?.status === 'occupied';
 
@@ -18,22 +21,31 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
     category: gig?.category || 'design' as Gig['category'],
     description: gig?.description || '',
     priceUSD: gig?.priceUSD || 100,
-    upfrontPercentage: gig?.upfrontPercentage || 20,
     tags: gig?.tags?.join(', ') || '',
     status: gig?.status || 'active' as Gig['status'],
     milestones: gig?.milestones || [] as MilestoneConfig[]
   });
 
-  const upfrontAmount = formData.priceUSD * (formData.upfrontPercentage / 100);
   const milestoneTotal = formData.milestones.reduce((acc, m) => acc + m.payoutUSD, 0);
-  const totalAllocated = upfrontAmount + milestoneTotal;
+  const totalAllocated = milestoneTotal;
   const isMilestonesValid = formData.milestones.length === 0 || Math.abs(totalAllocated - formData.priceUSD) < 0.01;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const tagsArray = formData.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+    const dataToValidate = { ...formData, tags: tagsArray };
+
+    const parsed = gigSchema.safeParse(dataToValidate);
+    if (!parsed.success) {
+      showToast(parsed.error.issues[0].message, 'error');
+      return;
+    }
+
     onSave({
-      ...formData,
-      tags: formData.tags.split(',').map(t => t.trim()).filter(t => t.length > 0)
+      ...parsed.data,
+      title: sanitizeInput(parsed.data.title),
+      description: sanitizeInput(parsed.data.description)
     });
   };
 
@@ -54,7 +66,7 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
           <div className="flex items-start gap-3 bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg mb-6">
             <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
             <p className="text-[10px] uppercase font-bold tracking-wider text-yellow-500 leading-relaxed">
-              This service is currently occupied by an active escrow contract. You cannot change the Price, Upfront %, or Description until the contract is completed.
+              This service is currently occupied by an active escrow contract. You cannot change the Price or Description until the contract is completed.
             </p>
           </div>
         )}
@@ -134,26 +146,6 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
                     isOccupied ? 'bg-white/5 border border-white/5 text-gray-400 cursor-not-allowed' : 'bg-obsidian border border-white/10 text-white focus:outline-none focus:border-neoncyan'
                   }`}
                 />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold tracking-wider text-gray-400 flex items-center justify-between">
-                <span>Required Upfront Payment (%)</span>
-                {isOccupied && <span className="text-yellow-500">Locked</span>}
-              </label>
-              <div className="flex items-center gap-4 bg-obsidian border border-white/10 rounded-lg p-3">
-                <input
-                  type="range"
-                  min="0" max="50" step="5"
-                  value={formData.upfrontPercentage}
-                  onChange={e => setFormData({...formData, upfrontPercentage: Number(e.target.value)})}
-                  disabled={isOccupied}
-                  className={`flex-1 ${isOccupied ? 'opacity-50 cursor-not-allowed' : 'accent-hotpink cursor-pointer'}`}
-                />
-                <span className={`text-sm font-bold font-mono ${isOccupied ? 'text-gray-400' : 'text-neongreen'}`}>
-                  {formData.upfrontPercentage}%
-                </span>
               </div>
             </div>
 
@@ -248,7 +240,7 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
 
               {formData.milestones.length > 0 && (
                 <div className={`mt-4 p-3 rounded-lg border text-sm font-bold flex items-center justify-between ${isMilestonesValid ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
-                  <span>Upfront: ${upfrontAmount.toFixed(2)} + Milestones: ${milestoneTotal.toFixed(2)}</span>
+                  <span>Milestones Total: ${milestoneTotal.toFixed(2)}</span>
                   <span>Sum: ${totalAllocated.toFixed(2)} / ${formData.priceUSD.toFixed(2)} {isMilestonesValid ? '(Correct!)' : '(Mismatch)'}</span>
                 </div>
               )}

@@ -8,7 +8,7 @@ import { ActiveDisputesView } from './ActiveDisputesView';
 import { HistoryView } from './HistoryView';
 
 export default function MediatorDashboard() {
-  const { isConnected, address, role } = useWallet();
+  const { isConnected, address } = useWallet();
   const [activeTab, setActiveTab] = useState('active_disputes');
 
   // Basic access control

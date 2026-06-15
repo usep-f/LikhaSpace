@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Calendar } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { Order, Gig } from '@/lib/mockGigs';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';

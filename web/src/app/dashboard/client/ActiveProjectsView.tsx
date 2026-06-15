@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
-import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, Coins, ShieldAlert } from 'lucide-react';
+import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, ShieldAlert } from 'lucide-react';
 import { Order, Gig } from '@/lib/mockGigs';
 import { ChatModal } from '@/components/ChatModal';
 import { DeliverablesModal } from '@/components/DeliverablesModal';
@@ -42,9 +42,8 @@ function getMilestonesConfig(order: Order) {
       max_revisions: m.maxRevisions
     }));
   }
-  const remainingPercent = 1 - order.upfrontPercentage / 100;
   return [{
-    payout_amount_usd: Math.round(order.priceUSD * remainingPercent * 100),
+    payout_amount_usd: Math.round(order.priceUSD * 100),
     max_revisions: 2
   }];
 }
@@ -101,7 +100,6 @@ export const ActiveProjectsView: React.FC = () => {
       const contractId = await deployAndInitializeEscrow(
         address,
         order.freelancerAddress,
-        Math.round(order.priceUSD * (order.upfrontPercentage / 100) * 100),
         1000,
         getMilestonesConfig(order)
       );
@@ -115,7 +113,7 @@ export const ActiveProjectsView: React.FC = () => {
         state: idx === 0 ? ('active' as const) : ('locked' as const),
       })) : [{
         title: 'Final Deliverable',
-        payoutUSD: order.priceUSD * (1 - order.upfrontPercentage / 100),
+        payoutUSD: order.priceUSD,
         maxRevisions: 2,
         revisionsUsed: 0,
         state: 'active' as const
@@ -218,32 +216,6 @@ export const ActiveProjectsView: React.FC = () => {
     }
   };
 
-  const handleReleaseUpfront = async (order: Order) => {
-    if (!address || !order.txHash) return showToast('Error: Missing contract data', 'error');
-    try {
-      showLoading('Releasing upfront payment on-chain...');
-      const { releaseUpfront } = await import('@/lib/contract');
-      await releaseUpfront(order.txHash, address);
-
-      const newChangelog = {
-        id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-        message: 'Upfront payment released by client.',
-      };
-
-      await updateOrderStatus(order.id, {
-        upfrontReleased: true,
-        changelogs: [...(order.changelogs || []), newChangelog]
-      });
-
-      showToast('Upfront payment successfully released!', 'success');
-    } catch (e: unknown) {
-      console.error(e);
-      showToast(`Release failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
-    } finally {
-      hideLoading();
-    }
-  };
 
   const handleApproveDeliverables = async (orderId: string) => {
     const order = clientOrders.find(o => o.id === orderId);
@@ -435,15 +407,9 @@ export const ActiveProjectsView: React.FC = () => {
               <p className="text-xs text-gray-400 mt-1">{order.gigInfo?.title}</p>
               
               <div className="bg-obsidian rounded-lg p-4 border border-white/5 max-w-sm mt-3">
-                <div className="flex justify-between text-xs mb-2">
+                <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Total Budget:</span>
                   <span className="font-bold text-white">${order.priceUSD} USD</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Upfront Payment ({order.upfrontPercentage}%):</span>
-                  <span className={`font-bold ${order.upfrontReleased ? 'text-neongreen' : 'text-yellow-500'}`}>
-                    ${(order.priceUSD * (order.upfrontPercentage / 100)).toFixed(2)} USD {order.upfrontReleased ? '(Released)' : '(Locked)'}
-                  </span>
                 </div>
               </div>
               {order.status === 'pending_acceptance' && (
@@ -459,60 +425,87 @@ export const ActiveProjectsView: React.FC = () => {
               </div>
 
               <div className="flex gap-2 flex-wrap justify-end">
-                {order.status === 'awaiting_funding' && (
-                  <>
-                    <button
-                      title="Fund Escrow"
-                      onClick={() => handleFundEscrow(order)}
-                      className="p-2.5 rounded bg-[#ff00ff]/20 border border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
-                    >
-                      <Activity className="w-5 h-5" />
-                    </button>
-                    <button
-                      title="Cancel Booking"
-                      onClick={() => handleCancelUnfunded(order)}
-                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </>
-                )}
-                {order.status === 'escrow_funded' && (
-                  <>
-                    {order.upfrontPercentage > 0 && !order.upfrontReleased && (
-                      <button
-                        title="Release Upfront Payment"
-                        onClick={() => handleReleaseUpfront(order)}
-                        className="p-2.5 rounded bg-neongreen/20 border border-neongreen text-neongreen hover:bg-neongreen/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(57,255,20,0.2)]"
-                      >
-                        <Coins className="w-5 h-5" />
-                      </button>
-                    )}
-                    <button
-                      title="Dispute Project"
-                      onClick={() => handleDisputeProject(order)}
-                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
-                    >
-                      <ShieldAlert className="w-5 h-5" />
-                    </button>
-                    <button
-                      title="Cancel Project"
-                      onClick={() => setActiveCancelOrder(order)}
-                      className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </>
-                )}
-                {(order.status === 'disputed' || order.status === 'mediation') && (
-                  <button
-                    title="Dispute Panel"
-                    onClick={() => setActiveDisputeOrder(order)}
-                    className="p-2.5 rounded bg-yellow-500/20 border border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 transition-colors cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)] font-bold text-xs uppercase tracking-wider px-4 py-2"
-                  >
-                    Dispute Panel
-                  </button>
-                )}
+                {/* Fund Escrow */}
+                <button
+                  title={
+                    order.status === 'awaiting_funding'
+                      ? "Fund Escrow"
+                      : "Fund Escrow (Only for bookings awaiting funding)"
+                  }
+                  disabled={order.status !== 'awaiting_funding'}
+                  onClick={() => handleFundEscrow(order)}
+                  className={`p-2.5 rounded border transition-colors ${
+                    order.status === 'awaiting_funding'
+                      ? "bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)]"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  <Activity className="w-5 h-5" />
+                </button>
+
+                {/* Dispute Project */}
+                <button
+                  title={
+                    order.status === 'escrow_funded'
+                      ? order.hasSubmittedOnce 
+                        ? "Dispute Project" 
+                        : "Dispute (Locked until first submission)"
+                      : "Dispute Project (Only for active funded projects)"
+                  }
+                  disabled={order.status !== 'escrow_funded' || !order.hasSubmittedOnce}
+                  onClick={() => handleDisputeProject(order)}
+                  className={`p-2.5 rounded border transition-colors ${
+                    (order.status === 'escrow_funded' && order.hasSubmittedOnce)
+                      ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  <ShieldAlert className="w-5 h-5" />
+                </button>
+
+                {/* Cancel Booking/Project */}
+                <button
+                  title={
+                    order.status === 'awaiting_funding'
+                      ? "Cancel Booking"
+                      : order.status === 'escrow_funded'
+                      ? "Cancel Project"
+                      : "Cancel Booking/Project (Unavailable)"
+                  }
+                  disabled={order.status !== 'awaiting_funding' && order.status !== 'escrow_funded'}
+                  onClick={() => {
+                    if (order.status === 'awaiting_funding') {
+                      handleCancelUnfunded(order);
+                    } else if (order.status === 'escrow_funded') {
+                      setActiveCancelOrder(order);
+                    }
+                  }}
+                  className={`p-2.5 rounded border transition-colors ${
+                    (order.status === 'awaiting_funding' || order.status === 'escrow_funded')
+                      ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                {/* Dispute Panel */}
+                <button
+                  title={
+                    (order.status === 'disputed' || order.status === 'mediation')
+                      ? "Dispute Panel"
+                      : "Dispute Panel (Only when project is in dispute)"
+                  }
+                  disabled={order.status !== 'disputed' && order.status !== 'mediation'}
+                  onClick={() => setActiveDisputeOrder(order)}
+                  className={`p-2.5 rounded transition-colors font-bold text-xs uppercase tracking-wider px-4 py-2 border ${
+                    (order.status === 'disputed' || order.status === 'mediation')
+                      ? "bg-yellow-500/20 border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                      : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  Dispute Panel
+                </button>
 
                 <button
                   title="Message"

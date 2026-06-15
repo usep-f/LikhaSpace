@@ -47,8 +47,8 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({ order, onClose }) 
             </div>
             <div>
               <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-0.5">Target Service</p>
-              <p className="text-sm font-bold text-white">{gigInfo?.title || 'Unknown Service'}</p>
-              <p className="text-xs text-gray-400 mt-1">Total: <span className="font-bold text-white">${order.priceUSD}</span> • Upfront: <span className="font-bold text-neongreen">{order.upfrontPercentage}%</span></p>
+              <p className="text-sm font-bold text-white mb-1">{gigInfo?.title || 'Unknown Service'}</p>
+              <p className="text-xs text-gray-400">Total: <span className="font-bold text-white">${order.priceUSD} USD</span></p>
             </div>
           </div>
 

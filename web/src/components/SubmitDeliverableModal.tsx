@@ -6,6 +6,7 @@ import { ref, uploadBytes } from 'firebase/storage';
 import { updateOrderStatus } from '@/lib/db';
 import { submitDeliverable } from '@/lib/contract';
 import { useNotification } from '@/context/NotificationContext';
+import { deliverableSchema, sanitizeInput } from '@/lib/validation';
 
 interface SubmitDeliverableModalProps {
   order: Order;
@@ -41,6 +42,14 @@ export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ 
       return;
     }
 
+    const parsed = deliverableSchema.safeParse({ link, notes });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0].message);
+      return;
+    }
+    const safeLink = parsed.data.link || '';
+    const safeNotes = sanitizeInput(parsed.data.notes || '');
+
     setIsSubmitting(true);
     setError('');
 
@@ -61,8 +70,8 @@ export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ 
       updatedMilestones[currentIdx] = {
         ...updatedMilestones[currentIdx],
         state: 'submitted',
-        deliverablesLink: link,
-        deliverableNotes: notes,
+        deliverablesLink: safeLink,
+        deliverableNotes: safeNotes,
         deliverablesStoragePath: storagePath,
         deliverablesFileName: fileName,
       };
@@ -80,6 +89,7 @@ export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ 
       await updateOrderStatus(order.id, {
         status: 'delivered', // Updates the main order status to delivered
         milestones: updatedMilestones,
+        hasSubmittedOnce: true,
         changelogs: [...(order.changelogs || []), newChangelog]
       });
 
