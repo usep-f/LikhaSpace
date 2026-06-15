@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Gig } from '@/lib/mockGigs';
 import { X, ShieldAlert, ArrowRight } from 'lucide-react';
+import { useNotification } from '@/context/NotificationContext';
+import { bookingMessageSchema, sanitizeInput } from '@/lib/validation';
 
 interface BookingModalProps {
   gig: Gig;
@@ -9,7 +11,17 @@ interface BookingModalProps {
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({ gig, onClose, onConfirm }) => {
+  const { showToast } = useNotification();
   const [message, setMessage] = useState('');
+
+  const handleConfirm = () => {
+    const parsed = bookingMessageSchema.safeParse({ message });
+    if (!parsed.success) {
+      showToast(parsed.error.issues[0].message, 'error');
+      return;
+    }
+    onConfirm(gig, sanitizeInput(parsed.data.message || ''));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-obsidian/80 backdrop-blur-sm">
@@ -85,7 +97,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ gig, onClose, onConf
             Cancel
           </button>
           <button
-            onClick={() => onConfirm(gig, message)}
+            onClick={handleConfirm}
             className="flex-1 py-2.5 rounded-lg bg-hotpink text-white font-heading font-bold text-xs uppercase tracking-wider hover:shadow-[0_0_15px_rgba(255,0,127,0.4)] transition-all flex items-center justify-center gap-2"
           >
             Send Request <ArrowRight className="w-4 h-4" />

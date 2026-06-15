@@ -15,6 +15,7 @@ import { StatusModal } from '@/components/StatusModal';
 import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 import { DisputeModal } from '@/components/DisputeModal';
 import { freelancerCancel, cancelUnfunded, requestMediation } from '@/lib/contract';
+import { profileSettingsSchema, denialMessageSchema, sanitizeInput } from '@/lib/validation';
 
 function getStatusBadge(order: Order) {
   if (order.status === 'pending_acceptance') return { text: 'Pending Acceptance', classes: 'bg-[#1a1400]/80 text-[#eab308] border border-[#eab308]/30 shadow-[0_0_8px_rgba(234,179,8,0.15)]' };
@@ -281,7 +282,15 @@ const OrdersView: React.FC = () => {
   const handleDenyRequest = async (orderId: string) => {
     try {
       showLoading('Declining booking request...');
-      const msg = denyMsgs[orderId] || '';
+      let msg = denyMsgs[orderId] || '';
+      
+      // Zod Validation & Sanitization
+      const parsed = denialMessageSchema.safeParse({ message: msg });
+      if (!parsed.success) {
+        throw new Error(parsed.error.issues[0].message);
+      }
+      msg = sanitizeInput(parsed.data.message || '');
+
       await updateOrderStatus(orderId, { 
         status: 'denied',
         denialMessage: msg
@@ -736,18 +745,43 @@ const ProfileSettingsView: React.FC = () => {
     portfolio: userProfile?.portfolio || '',
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (errors[e.target.name]) {
+      setErrors({ ...errors, [e.target.name]: '' });
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+    
+    const parsed = profileSettingsSchema.safeParse(formData);
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {};
+      parsed.error.issues.forEach(err => {
+        if (err.path[0]) fieldErrors[err.path[0].toString()] = err.message;
+      });
+      setErrors(fieldErrors);
+      showToast('Please fix the errors in the form.', 'error');
+      return;
+    }
+
     try {
       showLoading('Saving profile...');
-      await registerProfile(formData);
+      const sanitizedData = {
+        ...parsed.data,
+        bio: sanitizeInput(parsed.data.bio || ''),
+        title: sanitizeInput(parsed.data.title || ''),
+        name: sanitizeInput(parsed.data.name),
+      };
+      await registerProfile(sanitizedData);
       showToast('Profile updated successfully!', 'success');
     } catch (err) {
       console.error(err);
+      showToast('Failed to update profile.', 'error');
     } finally {
       hideLoading();
     }
@@ -776,22 +810,27 @@ const ProfileSettingsView: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
           <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
           <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Phone</label>
           <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Professional Title</label>
           <input type="text" name="title" value={formData.title} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.title && <p className="text-red-400 text-xs mt-1">{errors.title}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1">Bio</label>
           <textarea name="bio" value={formData.bio} onChange={handleChange} rows={3} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink" />
+          {errors.bio && <p className="text-red-400 text-xs mt-1">{errors.bio}</p>}
         </div>
         <div className="flex justify-between pt-4 mt-4 border-t border-white/5">
           <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-500/10 text-red-400 font-bold text-sm rounded hover:bg-red-500/20 transition-colors">

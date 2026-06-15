@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Gig, MilestoneConfig } from '@/lib/mockGigs';
 import { X, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { gigSchema, sanitizeInput } from '@/lib/validation';
+import { useNotification } from '@/context/NotificationContext';
 
 interface ListingModalProps {
   gig?: Gig | null; // Pass gig to edit, or null to create new
@@ -9,6 +11,7 @@ interface ListingModalProps {
 }
 
 export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave }) => {
+  const { showToast } = useNotification();
   const isEditing = !!gig;
   const isOccupied = gig?.status === 'occupied';
 
@@ -29,9 +32,20 @@ export const ListingModal: React.FC<ListingModalProps> = ({ gig, onClose, onSave
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const tagsArray = formData.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+    const dataToValidate = { ...formData, tags: tagsArray };
+
+    const parsed = gigSchema.safeParse(dataToValidate);
+    if (!parsed.success) {
+      showToast(parsed.error.issues[0].message, 'error');
+      return;
+    }
+
     onSave({
-      ...formData,
-      tags: formData.tags.split(',').map(t => t.trim()).filter(t => t.length > 0)
+      ...parsed.data,
+      title: sanitizeInput(parsed.data.title),
+      description: sanitizeInput(parsed.data.description)
     });
   };
 
