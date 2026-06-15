@@ -44,11 +44,13 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.clientAddress == request.auth.uid;
 
-      // Only the client, freelancer, or mediator can update it
+      // Only the client, freelancer, or mediator can update it, and they can only modify specific mutable fields
       allow update: if request.auth != null
         && (resource.data.clientAddress == request.auth.uid
          || resource.data.freelancerAddress == request.auth.uid
-         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mediator');
+         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mediator')
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'changelogs', 'chatMessages', 'currentMilestoneIdx', 'milestones', 'denialMessage', 'txHash', 'progressPercentage', 'review', 'hasSubmittedOnce']);
 
       // Deletion not permitted — orders are permanent audit records
       allow delete: if false;
