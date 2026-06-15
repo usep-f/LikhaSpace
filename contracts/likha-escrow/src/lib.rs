@@ -98,7 +98,13 @@ fn get_stroops_per_cent(env: &Env, oracle: &Address) -> i128 {
         &Symbol::new(env, "lastprice"),
         soroban_sdk::vec![env, Asset::Other(Symbol::new(env, "XLM")).into_val(env)],
     );
-    let price_feed = price_feed_opt.unwrap();
+    let price_feed = price_feed_opt.expect("Oracle price feed not found");
+    
+    // Add staleness and timestamp sanity check (max 1 hour old)
+    let current_time = env.ledger().timestamp();
+    assert!(current_time >= price_feed.timestamp, "Oracle timestamp in future");
+    assert!(current_time - price_feed.timestamp < 3600, "Oracle price feed is stale");
+    
     let scale = 10i128.pow(decimals + 5);
     scale / price_feed.price
 }
