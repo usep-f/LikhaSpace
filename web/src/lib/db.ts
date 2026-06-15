@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { db } from './firebase';
 import { Order, Gig } from './mockGigs'; // Reusing the interfaces from mockGigs
 
@@ -86,5 +86,18 @@ export function subscribeToMediatorOrders(callback: (orders: Order[]) => void) {
   const q = query(collection(db, 'orders'), where('status', 'in', ['disputed', 'mediation', 'settled_dispute']));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => d.data() as Order));
+  });
+}
+
+/** CHAT */
+
+export async function sendChatMessage(orderId: string, senderAddress: string, text: string) {
+  await updateDoc(doc(db, 'orders', orderId), {
+    chatMessages: arrayUnion({
+      id: crypto.randomUUID(),
+      senderAddress,
+      text,
+      timestamp: new Date().toISOString()
+    })
   });
 }
