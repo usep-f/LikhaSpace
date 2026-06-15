@@ -30,7 +30,7 @@ function GigsContent() {
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   const { showToast } = useNotification();
-  const { address } = useWallet();
+  const { address, userProfile } = useWallet();
 
   const handleProfileClick = async (profileAddress: string) => {
     try {
@@ -67,7 +67,7 @@ function GigsContent() {
         id: orderId,
         gigId: gig.id,
         clientAddress: address,
-        clientName: 'Client (' + address.slice(0, 4) + '...' + address.slice(-4) + ')',
+        clientName: userProfile?.name || 'Client (' + address.slice(0, 4) + '...' + address.slice(-4) + ')',
         freelancerAddress: gig.freelancerAddress,
         status: 'pending_acceptance',
         priceUSD: gig.priceUSD,

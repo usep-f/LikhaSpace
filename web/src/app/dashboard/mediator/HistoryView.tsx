@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { Order, Gig } from '@/lib/mockGigs';
+import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
 import { subscribeToMediatorOrders, getGig } from '@/lib/db';
@@ -61,10 +62,20 @@ export const HistoryView: React.FC = () => {
                   Resolved Dispute
                 </p>
               </div>
-              <p className="text-sm font-bold text-white flex items-center gap-1 mb-1">
-                Freelancer: {order.gigInfo?.freelancerName || order.freelancerAddress} <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
-              </p>
-              <p className="text-sm text-gray-300">Client: {order.clientName || order.clientAddress}</p>
+              <div className="flex items-center gap-1 mb-1">
+                <UserWalletInfo
+                  address={order.freelancerAddress}
+                  role="freelancer"
+                  fallbackName={order.gigInfo?.freelancerName}
+                />
+                <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
+              </div>
+              <UserWalletInfo
+                address={order.clientAddress}
+                role="client"
+                fallbackName={order.clientName}
+                className="mb-1"
+              />
               <p className="text-xs text-gray-400 mt-1">{order.gigInfo?.title}</p>
               
               <div className="bg-obsidian rounded-lg p-4 border border-white/5 max-w-sm mt-3">

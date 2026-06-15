@@ -14,6 +14,8 @@ import { ChatModal } from '@/components/ChatModal';
 import { StatusModal } from '@/components/StatusModal';
 import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 import { DisputeModal } from '@/components/DisputeModal';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
+import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { freelancerCancel, cancelUnfunded, requestMediation } from '@/lib/contract';
 import { profileSettingsSchema, denialMessageSchema, sanitizeInput } from '@/lib/validation';
 
@@ -425,7 +427,9 @@ const OrdersView: React.FC = () => {
         {paginatedOrders.length > 0 ? (
           paginatedOrders.map(order => (
             <div key={order.id} className={`p-6 rounded-xl glass-card border flex flex-col md:flex-row justify-between items-center gap-6 ${
-              order.status === 'pending_acceptance' ? 'border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'border-white/5'
+              order.status === 'pending_acceptance' ? 'border-neoncyan/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]' :
+              order.status === 'delivered' ? 'border-neongreen/20' :
+              'border-white/5'
             }`}>
                <div className="flex-1 w-full">
                  <div className="flex items-center gap-3 mb-1">
@@ -435,7 +439,12 @@ const OrdersView: React.FC = () => {
                      {order.status === 'pending_acceptance' ? 'New Request' : 'Active Order'}
                    </p>
                  </div>
-                 <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
+                 <UserWalletInfo
+                   address={order.clientAddress}
+                   role="client"
+                   fallbackName={order.clientName}
+                   className="mb-1"
+                 />
                  <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
                </div>
 
@@ -459,147 +468,93 @@ const OrdersView: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex gap-2 flex-wrap justify-end">
-                      {/* View Proposal */}
-                      <button
-                        title={
-                          order.status === 'pending_acceptance'
-                            ? "View Proposal"
-                            : "View Proposal (Only for pending bookings)"
-                        }
-                        disabled={order.status !== 'pending_acceptance'}
-                        onClick={() => setActiveProposalOrder(order)}
-                        className={`p-2.5 rounded border transition-all ${
-                          order.status === 'pending_acceptance'
-                            ? "bg-neoncyan/10 border-neoncyan/30 text-neoncyan hover:bg-neoncyan/20 cursor-pointer"
-                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        <Eye className="w-5 h-5" />
-                      </button>
+                    <div className="flex gap-2 flex-wrap justify-end items-center">
+                      {order.status === 'pending_acceptance' && (
+                        <>
+                          <button
+                            title="Accept Request"
+                            onClick={() => handleAcceptBooking(order.id)}
+                            className="p-2.5 rounded bg-neongreen text-obsidian hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] transition-all cursor-pointer"
+                          >
+                            <Check className="w-5 h-5" />
+                          </button>
+                          <button
+                            title="Deny Request"
+                            onClick={() => setShowDenyInput({ ...showDenyInput, [order.id]: true })}
+                            className="p-2.5 rounded bg-red-500/20 border border-red-500 text-red-500 hover:bg-red-500/40 transition-colors cursor-pointer"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
 
-                      {/* Accept Request */}
-                      <button
-                        title={
-                          order.status === 'pending_acceptance'
-                            ? "Accept Request"
-                            : "Accept Request (Only for pending bookings)"
-                        }
-                        disabled={order.status !== 'pending_acceptance'}
-                        onClick={() => handleAcceptBooking(order.id)}
-                        className={`p-2.5 rounded transition-all ${
-                          order.status === 'pending_acceptance'
-                            ? "bg-neongreen text-obsidian hover:shadow-[0_0_10px_rgba(57,255,20,0.4)] cursor-pointer"
-                            : "bg-gray-500/10 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        <Check className="w-5 h-5" />
-                      </button>
+                      {order.status !== 'pending_acceptance' && (
+                        <>
+                          {order.status === 'escrow_funded' && (
+                            <button
+                              title="Submit Deliverables"
+                              onClick={() => setActiveSubmitOrder(order)}
+                              className="p-2.5 rounded border bg-neoncyan border-neoncyan/30 text-obsidian hover:bg-neoncyan/80 shadow-[0_0_10px_rgba(0,255,255,0.4)] transition-all cursor-pointer"
+                            >
+                              <UploadCloud className="w-5 h-5" />
+                            </button>
+                          )}
+                          {(order.status === 'disputed' || order.status === 'mediation') && (
+                            <button
+                              title="Dispute Panel"
+                              onClick={() => setActiveDisputeOrder(order)}
+                              className="p-2.5 rounded transition-colors font-bold text-xs uppercase tracking-wider px-4 py-2 border bg-yellow-500/20 border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                            >
+                              Dispute Panel
+                            </button>
+                          )}
+                          <button
+                            title="Message"
+                            onClick={() => setActiveChatOrder(order)}
+                            className="p-2.5 rounded bg-[#141026] border border-white/10 text-white hover:bg-white/5 transition-colors cursor-pointer"
+                          >
+                            <MessageSquare className="w-5 h-5" />
+                          </button>
+                          <button
+                            title="View Status"
+                            onClick={() => setActiveStatusOrder(order)}
+                            className="p-2.5 rounded bg-white text-black hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
+                          >
+                            <Activity className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
 
-                      {/* Submit Deliverables */}
-                      <button
-                        title={
-                          order.status === 'escrow_funded'
-                            ? "Submit Deliverables"
-                            : "Submit Deliverables (Only for active funded projects)"
-                        }
-                        disabled={order.status !== 'escrow_funded'}
-                        onClick={() => setActiveSubmitOrder(order)}
-                        className={`p-2.5 rounded border transition-all ${
-                          order.status === 'escrow_funded'
-                            ? "bg-neoncyan border border-neoncyan/30 text-obsidian hover:bg-neoncyan/80 shadow-[0_0_10px_rgba(0,255,255,0.4)] cursor-pointer"
-                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        <UploadCloud className="w-5 h-5" />
-                      </button>
-
-                      {/* Dispute Project */}
-                      <button
-                        title={
-                          order.status === 'escrow_funded'
-                            ? order.hasSubmittedOnce
-                              ? "Dispute Project"
-                              : "Dispute (Locked until first submission)"
-                            : "Dispute Project (Only for active funded projects)"
-                        }
-                        disabled={order.status !== 'escrow_funded' || !order.hasSubmittedOnce}
-                        onClick={() => handleDisputeProject(order)}
-                        className={`p-2.5 rounded border transition-colors ${
-                          (order.status === 'escrow_funded' && order.hasSubmittedOnce)
-                            ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
-                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        <ShieldAlert className="w-5 h-5" />
-                      </button>
-
-                      {/* Cancel / Deny / Refund Request */}
-                      <button
-                        title={
-                          order.status === 'pending_acceptance'
-                            ? "Deny Request"
-                            : order.status === 'awaiting_funding'
-                            ? "Cancel Request"
-                            : order.status === 'escrow_funded'
-                            ? "Cancel Project (Refund)"
-                            : "Cancel/Deny (Unavailable)"
-                        }
-                        disabled={
-                          order.status !== 'pending_acceptance' &&
-                          order.status !== 'awaiting_funding' &&
-                          order.status !== 'escrow_funded'
-                        }
-                        onClick={() => {
-                          if (order.status === 'pending_acceptance') {
-                            setShowDenyInput({ ...showDenyInput, [order.id]: true });
-                          } else if (order.status === 'awaiting_funding') {
-                            handleCancelUnfunded(order);
-                          } else if (order.status === 'escrow_funded') {
-                            handleCancelFunded(order);
-                          }
-                        }}
-                        className={`p-2.5 rounded border transition-colors ${
-                          (order.status === 'pending_acceptance' || order.status === 'awaiting_funding' || order.status === 'escrow_funded')
-                            ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/40 cursor-pointer"
-                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-
-                      {/* Dispute Panel */}
-                      <button
-                        title={
-                          (order.status === 'disputed' || order.status === 'mediation')
-                            ? "Dispute Panel"
-                            : "Dispute Panel (Only when project is in dispute)"
-                        }
-                        disabled={order.status !== 'disputed' && order.status !== 'mediation'}
-                        onClick={() => setActiveDisputeOrder(order)}
-                        className={`p-2.5 rounded transition-colors font-bold text-xs uppercase tracking-wider px-4 py-2 border ${
-                          (order.status === 'disputed' || order.status === 'mediation')
-                            ? "bg-yellow-500/20 border-yellow-500 text-yellow-500 hover:bg-yellow-500/40 cursor-pointer shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                            : "bg-gray-500/10 border-gray-500/30 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        Dispute Panel
-                      </button>
-
-                      <button
-                        title="Message"
-                        onClick={() => setActiveChatOrder(order)}
-                        className="p-2.5 rounded bg-[#141026] border border-white/10 text-white hover:bg-white/5 transition-colors cursor-pointer"
-                      >
-                        <MessageSquare className="w-5 h-5" />
-                      </button>
-                      <button
-                        title="View Status"
-                        onClick={() => setActiveStatusOrder(order)}
-                        className="p-2.5 rounded bg-white text-black hover:shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
-                      >
-                        <Activity className="w-5 h-5" />
-                      </button>
+                      {/* Dropdown Menu for Secondary/Destructive Actions */}
+                      <DropdownMenu 
+                        items={[
+                          ...(order.status === 'pending_acceptance' ? [{
+                            label: 'View Proposal',
+                            icon: <Eye className="w-4 h-4" />,
+                            onClick: () => setActiveProposalOrder(order)
+                          }] : []),
+                          ...(order.status === 'awaiting_funding' ? [{
+                            label: 'Cancel Request',
+                            icon: <X className="w-4 h-4" />,
+                            destructive: true,
+                            onClick: () => handleCancelUnfunded(order)
+                          }] : []),
+                          ...((order.status === 'escrow_funded' || order.status === 'delivered') ? [
+                            {
+                              label: 'Cancel Project (Refund)',
+                              icon: <X className="w-4 h-4" />,
+                              destructive: true,
+                              onClick: () => handleCancelFunded(order)
+                            },
+                            {
+                              label: 'Dispute Project',
+                              icon: <ShieldAlert className="w-4 h-4" />,
+                              destructive: true,
+                              onClick: () => order.hasSubmittedOnce ? handleDisputeProject(order) : showToast('Dispute locked until first submission', 'error')
+                            }
+                          ] : [])
+                        ]}
+                      />
                     </div>
                   )}
                </div>
@@ -695,7 +650,12 @@ const HistoryView: React.FC = () => {
                      {order.status === 'completed' ? 'Completed Order' : 
                       order.status === 'settled_dispute' ? 'Settled Dispute' : 'Cancelled Order'}
                    </p>
-                   <p className="text-sm font-bold text-white">Client: {order.clientName}</p>
+                   <UserWalletInfo
+                     address={order.clientAddress}
+                     role="client"
+                     fallbackName={order.clientName}
+                     className="mb-1"
+                   />
                    <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
                  </div>
                  <div className="text-right">
