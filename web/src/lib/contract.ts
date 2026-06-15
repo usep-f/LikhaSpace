@@ -64,10 +64,11 @@ export async function getOraclePrice(): Promise<number> {
         }
       }
     }
+    throw new Error('Simulation failed to retrieve price from oracle');
   } catch (e) {
     console.error('Failed to fetch oracle price:', e);
+    throw e;
   }
-  return 10000;
 }
 
 export async function getRequiredXlmForGig(priceUSD: number): Promise<number> {

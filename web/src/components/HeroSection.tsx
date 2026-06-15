@@ -4,6 +4,7 @@ import React from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { Search, ArrowRight, ShieldCheck, Coins, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { LivePriceCard } from './ui/LivePriceCard';
 
 // Sub-component: Escrow Flow Chart Diagram (Right side)
 const EscrowFlowMockup: React.FC = () => (
@@ -197,10 +198,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ searchVal, onSearchCha
           />
         </div>
 
-        <div className="lg:col-span-5 w-full flex justify-center">
+        <div className="lg:col-span-5 w-full flex flex-col items-center gap-4">
           <div className="w-full max-w-md">
             <EscrowFlowMockup />
           </div>
+          <LivePriceCard />
         </div>
       </div>
     </section>
