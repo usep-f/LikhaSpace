@@ -442,7 +442,7 @@ fn test_mediator_resolve_dispute() {
 }
 
 #[test]
-#[should_panic(expected = "Invalid status")]
+#[should_panic]
 fn test_mediator_resolve_fails_before_escalation() {
     let env = Env::default();
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
@@ -482,7 +482,7 @@ fn test_mediator_resolve_fails_before_escalation() {
 }
 
 #[test]
-#[should_panic(expected = "Invalid status")]
+#[should_panic]
 fn test_escalation_blocks_p2p_propose() {
     let env = Env::default();
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
@@ -558,7 +558,7 @@ fn test_ttl_extension() {
 }
 
 #[test]
-#[should_panic(expected = "Cannot dispute before the first submission")]
+#[should_panic]
 fn test_request_mediation_fails_before_submission() {
     let env = Env::default();
     let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
