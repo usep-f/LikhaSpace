@@ -80,6 +80,7 @@ pub struct EscrowConfig {
     pub oracle: Address,
     pub mediator: Address,
     pub treasury: Address,
+    pub reputation_contract: Address,
     pub paid_revision_price_usd: i128,
 }
 
@@ -177,6 +178,7 @@ impl LikhaEscrow {
         oracle: Address,
         mediator: Address,
         treasury: Address,
+        reputation_contract: Address,
         paid_revision_price_usd: i128,
         milestones: Vec<Milestone>,
     ) {
@@ -192,6 +194,7 @@ impl LikhaEscrow {
             oracle,
             mediator,
             treasury,
+            reputation_contract,
             paid_revision_price_usd,
         };
 
@@ -305,6 +308,18 @@ impl LikhaEscrow {
         
         let token_client = token::Client::new(env, &config.token);
         token_client.transfer(&env.current_contract_address(), &config.freelancer, &payout_xlm);
+        
+        // Update reputation
+        let _: () = env.invoke_contract(
+            &config.reputation_contract,
+            &Symbol::new(env, "record_project"),
+            soroban_sdk::vec![
+                env,
+                env.current_contract_address().into_val(env),
+                config.freelancer.clone().into_val(env),
+                payout_xlm.into_val(env)
+            ],
+        );
         
         locked_xlm -= payout_xlm;
         env.storage().instance().set(&DataKey::LockedXlmBalance, &locked_xlm);

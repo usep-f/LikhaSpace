@@ -10,6 +10,7 @@ import { DeliverablesModal } from '@/components/DeliverablesModal';
 import { StatusModal } from '@/components/StatusModal';
 import { CancelModal } from '@/components/CancelModal';
 import { DisputeModal } from '@/components/DisputeModal';
+import { ReviewModal } from '@/components/ReviewModal';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
@@ -69,6 +70,7 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
   const [activeCancelOrder, setActiveCancelOrder] = useState<Order | null>(null);
   const [activeDisputeOrder, setActiveDisputeOrder] = useState<Order | null>(null);
+  const [activeReviewOrder, setActiveReviewOrder] = useState<Order | null>(null);
 
   const { showToast, showLoading, hideLoading } = useNotification();
 
@@ -261,6 +263,9 @@ export const ActiveProjectsView: React.FC = () => {
       
       showToast(hasNext ? 'Milestone approved. Funds released!' : 'Final deliverable approved. Project completed!', 'success');
       setActiveDeliverablesOrder(null);
+      if (!hasNext) {
+        setActiveReviewOrder(order);
+      }
     } catch (e: unknown) {
       console.error(e);
       showToast(`Approval failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -571,6 +576,14 @@ export const ActiveProjectsView: React.FC = () => {
           onSuccess={() => {
             setActiveDisputeOrder(null);
           }}
+        />
+      )}
+
+      {activeReviewOrder && (
+        <ReviewModal
+          order={activeReviewOrder}
+          onClose={() => setActiveReviewOrder(null)}
+          onReviewSubmitted={() => setActiveReviewOrder(null)}
         />
       )}
     </div>
