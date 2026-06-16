@@ -23,8 +23,8 @@ export const DeliverablesModal: React.FC<DeliverablesModalProps> = ({ order, onC
 
   const title = milestone ? `Review Milestone: ${milestone.title}` : 'Review Deliverables';
   
-  const link = milestone?.deliverablesLink || order.deliverablesLink;
-  const notes = milestone?.deliverableNotes || order.deliverableNotes;
+  const link = milestone?.deliverablesLink;
+  const notes = milestone?.deliverableNotes;
   const storagePath = milestone?.deliverablesStoragePath;
   const fileName = milestone?.deliverablesFileName;
 

@@ -62,9 +62,6 @@ export interface Order {
   currentMilestoneIdx?: number;
   hasSubmittedOnce?: boolean;
 
-  // Deliverables
-  deliverablesLink?: string;
-  deliverableNotes?: string;
 
   // Progress & History
   progressPercentage: number;
