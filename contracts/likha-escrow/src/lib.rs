@@ -310,6 +310,25 @@ impl LikhaEscrow {
         token_client.transfer(&env.current_contract_address(), &config.freelancer, &payout_xlm);
         
         // Update reputation
+        env.authorize_as_current_contract(soroban_sdk::vec![
+            env,
+            soroban_sdk::auth::InvokerContractAuthEntry::Contract(
+                soroban_sdk::auth::SubContractInvocation {
+                    context: soroban_sdk::auth::ContractContext {
+                        contract: config.reputation_contract.clone(),
+                        fn_name: Symbol::new(env, "record_project"),
+                        args: soroban_sdk::vec![
+                            env,
+                            env.current_contract_address().into_val(env),
+                            config.freelancer.clone().into_val(env),
+                            payout_xlm.into_val(env),
+                        ],
+                    },
+                    sub_invocations: soroban_sdk::vec![env],
+                },
+            ),
+        ]);
+
         let _: () = env.invoke_contract(
             &config.reputation_contract,
             &Symbol::new(env, "record_project"),

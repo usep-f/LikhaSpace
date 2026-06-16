@@ -484,18 +484,20 @@ export async function getFreelancerReputation(freelancerAddress: string): Promis
     if (rpc.Api.isSimulationSuccess(sim) && sim.result) {
       const native = scValToNative(sim.result.retval);
       if (native && typeof native === 'object') {
-        const reviews = Array.isArray(native.reviews) ? native.reviews.map((r: any) => ({
-          client: r.client?.toString() || '',
+        const nativeObj = native as Record<string, unknown>;
+        const reviewsList = nativeObj.reviews;
+        const reviews = Array.isArray(reviewsList) ? (reviewsList as Array<Record<string, unknown>>).map((r) => ({
+          client: typeof r.client === 'object' && r.client ? r.client.toString() : '',
           rating: Number(r.rating || 0),
-          text: r.text || '',
+          text: typeof r.text === 'string' ? r.text : '',
           timestamp: Number(r.timestamp || 0)
         })) : [];
         
         return {
-          projectsCompleted: Number(native.projects_completed || 0),
-          totalEarnedStroops: BigInt(native.total_earned_stroops || 0),
-          ratingSum: Number(native.rating_sum || 0),
-          ratingCount: Number(native.rating_count || 0),
+          projectsCompleted: Number(nativeObj.projects_completed || 0),
+          totalEarnedStroops: BigInt((nativeObj.total_earned_stroops as number | bigint | string) || 0),
+          ratingSum: Number(nativeObj.rating_sum || 0),
+          ratingCount: Number(nativeObj.rating_count || 0),
           reviews
         };
       }
