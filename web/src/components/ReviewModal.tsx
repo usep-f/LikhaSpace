@@ -3,7 +3,7 @@ import { X, Star, Loader2 } from 'lucide-react';
 import { Order } from '@/lib/mockGigs';
 import { submitReviewTransaction } from '@/lib/contract';
 import { useNotification } from '@/context/NotificationContext';
-import { updateOrderStatus } from '@/lib/db';
+import { updateOrderStatus, getGig, updateGig } from '@/lib/db';
 
 interface ReviewModalProps {
   order: Order;
@@ -16,11 +16,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ order, onClose, onRevi
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [reviewText, setReviewText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { notify } = useNotification();
+  const { showToast } = useNotification();
 
   const handleSubmit = async () => {
     if (rating === 0) {
-      notify('error', 'Please select a rating');
+      showToast('Please select a rating', 'error');
       return;
     }
     
@@ -34,11 +34,27 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ order, onClose, onRevi
           text: reviewText
         }
       });
-      notify('success', 'Review submitted successfully!');
+
+      // Update gig with new rating average
+      const gigDoc = await getGig(order.gigId);
+      if (gigDoc) {
+        const oldReviewsCount = gigDoc.reviewsCount || 0;
+        const oldRating = gigDoc.rating || 0;
+        const newReviewsCount = oldReviewsCount + 1;
+        const newRating = Number(((oldRating * oldReviewsCount + rating) / newReviewsCount).toFixed(1));
+        
+        await updateGig(order.gigId, {
+          rating: newRating,
+          reviewsCount: newReviewsCount
+        });
+      }
+
+      showToast('Review submitted successfully!', 'success');
       onReviewSubmitted();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      notify('error', 'Failed to submit review', e.message);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      showToast(errorMsg || 'Failed to submit review', 'error');
     } finally {
       setIsSubmitting(false);
     }

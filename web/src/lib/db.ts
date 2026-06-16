@@ -17,6 +17,10 @@ export async function getGig(gigId: string): Promise<Gig | null> {
   return null;
 }
 
+export async function updateGig(gigId: string, updates: Partial<Gig>) {
+  await updateDoc(doc(db, 'gigs', gigId), updates);
+}
+
 export async function getUserProfile(address: string) {
   const docRef = doc(db, 'users', address);
   const snap = await getDoc(docRef);

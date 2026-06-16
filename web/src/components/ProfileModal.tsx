@@ -54,9 +54,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose }) 
 
   const projectsCompleted = onChainReputation ? onChainReputation.projectsCompleted : profile.projectsCompleted;
   const totalEarnedXLM = onChainReputation ? Number(onChainReputation.totalEarnedStroops) / 10000000 : profile.totalEarnedXLM;
-  const averageRating = onChainReputation && onChainReputation.ratingCount > 0 
-    ? (onChainReputation.ratingSum / onChainReputation.ratingCount).toFixed(1)
-    : profile.averageRating;
+  const hasReviews = allReviews.length > 0;
+  const averageRating = hasReviews
+    ? (allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length).toFixed(1)
+    : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-obsidian/80 backdrop-blur-sm">
@@ -95,7 +96,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose }) 
             <div className="pb-1 text-right">
               <div className="flex items-center justify-end space-x-1 text-yellow-400 font-bold text-sm">
                 <Star className="w-4 h-4 fill-current" />
-                <span>{averageRating} Rating</span>
+                <span>{averageRating !== null ? `${averageRating} Rating` : 'No Reviews'}</span>
               </div>
               <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-1">Based on reviews</p>
             </div>

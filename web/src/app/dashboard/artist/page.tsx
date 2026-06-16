@@ -16,7 +16,7 @@ import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 import { DisputeModal } from '@/components/DisputeModal';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
-import { freelancerCancel, cancelUnfunded, requestMediation } from '@/lib/contract';
+import { freelancerCancel, cancelUnfunded, requestMediation, getFreelancerReputation, ReputationData } from '@/lib/contract';
 import { profileSettingsSchema, denialMessageSchema, sanitizeInput } from '@/lib/validation';
 
 function getStatusBadge(order: Order) {
@@ -809,6 +809,7 @@ export default function ArtistDashboard() {
   const { isConnected, address } = useWallet();
   const [activeTab, setActiveTab] = useState('listings');
   const [profile, setProfile] = useState<FreelancerProfile | null>(null);
+  const [onChainReputation, setOnChainReputation] = useState<ReputationData | null>(null);
 
   React.useEffect(() => {
     if (!address) return;
@@ -830,12 +831,27 @@ export default function ArtistDashboard() {
         }
       })
       .catch(console.error);
+
+    getFreelancerReputation(address)
+      .then((rep) => {
+        setOnChainReputation(rep);
+      })
+      .catch(console.error);
   }, [address]);
 
   // Calculate dynamic stats
-  const totalEarned = profile?.totalEarnedXLM || 0;
-  const completed = profile?.projectsCompleted || 0;
-  const rating = profile?.averageRating || 5.0;
+  const completed = onChainReputation ? onChainReputation.projectsCompleted : (profile?.projectsCompleted || 0);
+  const totalEarned = onChainReputation ? Number(onChainReputation.totalEarnedStroops) / 10000000 : (profile?.totalEarnedXLM || 0);
+
+  // Check if there are any reviews in either database or on-chain
+  const hasOnChainReviews = onChainReputation && onChainReputation.ratingCount > 0;
+  const hasDbReviews = profile && profile.testimonials && profile.testimonials.length > 0;
+  
+  const ratingValue = hasOnChainReviews
+    ? onChainReputation.ratingSum / onChainReputation.ratingCount
+    : (hasDbReviews ? profile.averageRating : null);
+
+  const ratingText = ratingValue !== null ? `${ratingValue.toFixed(1)} Rating` : 'No Reviews';
 
   return (
     <div className="min-h-screen bg-obsidian text-white py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -854,7 +870,7 @@ export default function ArtistDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <ReputationStatCard label="Total XLM Earned" value={`${totalEarned.toLocaleString()} XLM`} colorClass="text-glow-green text-neongreen" />
         <ReputationStatCard label="Gigs Completed" value={`${completed} Projects`} colorClass="text-glow-pink text-hotpink" />
-        <ReputationStatCard label="On-Chain Reputation" value={`${rating.toFixed(1)} Rating`} colorClass="text-glow-cyan text-neoncyan" />
+        <ReputationStatCard label="On-Chain Reputation" value={ratingText} colorClass="text-glow-cyan text-neoncyan" />
       </div>
 
       <div className="mt-8">
