@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Gig } from '@/lib/mockGigs';
+import { Gig } from '@/lib/types';
 import { Tag, HelpCircle, ArrowUpRight, Star, Search } from 'lucide-react';
 import { getAllGigs } from '@/lib/db';
 

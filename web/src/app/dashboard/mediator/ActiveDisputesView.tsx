@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, MessageSquare, ShieldAlert } from 'lucide-react';
-import { Order, Gig } from '@/lib/mockGigs';
+import { Order, Gig } from '@/lib/types';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Order, MilestoneConfig } from '@/lib/mockGigs';
+import { Order, MilestoneConfig } from '@/lib/types';
 import { X, ExternalLink, CheckCircle, AlertTriangle, Download, DollarSign } from 'lucide-react';
 import { storage } from '@/lib/firebase';
 import { ref, getDownloadURL } from 'firebase/storage';

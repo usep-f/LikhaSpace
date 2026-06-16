@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
 import { Sparkles, PlusCircle, Check, X, Eye, MessageSquare, Activity, UploadCloud, ShieldAlert } from 'lucide-react';
-import { Order, Gig, FreelancerProfile } from '@/lib/mockGigs';
+import { Order, Gig, FreelancerProfile } from '@/lib/types';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
 import { subscribeToFreelancerOrders, updateOrderStatus, createGig, getFreelancerGigs, getUserProfile, getFreelancerOrders } from '@/lib/db';
@@ -269,9 +269,18 @@ const OrdersView: React.FC = () => {
   });
 
   const handleAcceptBooking = async (orderId: string) => {
+    const order = myOrders.find(o => o.id === orderId);
     try {
       showLoading('Accepting booking request...');
-      await updateOrderStatus(orderId, { status: 'awaiting_funding' });
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: 'Booking request accepted by freelancer. Awaiting escrow funding.'
+      };
+      await updateOrderStatus(orderId, { 
+        status: 'awaiting_funding',
+        changelogs: [...(order?.changelogs || []), newChangelog]
+      });
       showToast('Booking accepted! Waiting for client to fund the escrow.', 'success');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -282,6 +291,7 @@ const OrdersView: React.FC = () => {
   };
 
   const handleDenyRequest = async (orderId: string) => {
+    const order = myOrders.find(o => o.id === orderId);
     try {
       showLoading('Declining booking request...');
       let msg = denyMsgs[orderId] || '';
@@ -293,9 +303,16 @@ const OrdersView: React.FC = () => {
       }
       msg = sanitizeInput(parsed.data.message || '');
 
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: `Booking request declined by freelancer.${msg ? ` Reason: ${msg}` : ''}`
+      };
+
       await updateOrderStatus(orderId, { 
         status: 'denied',
-        denialMessage: msg
+        denialMessage: msg,
+        changelogs: [...(order?.changelogs || []), newChangelog]
       });
       setShowDenyInput({ ...showDenyInput, [orderId]: false });
       showToast('Booking request declined.', 'success');
@@ -359,6 +376,7 @@ const OrdersView: React.FC = () => {
 
           await updateOrderStatus(order.id, {
             status: 'denied',
+            progressPercentage: 100,
             changelogs: [...(order.changelogs || []), newChangelog]
           });
 

@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { db } from './firebase';
-import { Order, Gig } from './mockGigs'; // Reusing the interfaces from mockGigs
+import { Order, Gig } from './types'; // Reusing the interfaces from types
 
 /** GIGS */
 
