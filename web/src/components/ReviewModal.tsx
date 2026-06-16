@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Star, Loader2 } from 'lucide-react';
-import { Order } from '@/lib/mockGigs';
+import { Order } from '@/lib/types';
 import { submitReviewTransaction } from '@/lib/contract';
 import { useNotification } from '@/context/NotificationContext';
 import { updateOrderStatus, getGig, updateGig } from '@/lib/db';
@@ -27,12 +27,19 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ order, onClose, onRevi
     setIsSubmitting(true);
     try {
       await submitReviewTransaction(order.clientAddress, order.freelancerAddress, rating, reviewText);
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: `Client submitted a ${rating}-star review.`
+      };
+
       // Optional: Add to order document
       await updateOrderStatus(order.id, {
         review: {
           rating,
           text: reviewText
-        }
+        },
+        changelogs: [...(order.changelogs || []), newChangelog]
       });
 
       // Update gig with new rating average

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { ShieldCheck } from 'lucide-react';
-import { Order, Gig } from '@/lib/mockGigs';
+import { Order, Gig } from '@/lib/types';
 import { getClientOrders, getGig } from '@/lib/db';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 

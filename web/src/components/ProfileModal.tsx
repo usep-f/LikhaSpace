@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FreelancerProfile, Order } from '@/lib/mockGigs';
+import { FreelancerProfile, Order } from '@/lib/types';
 import { X, Star, CheckCircle, ShieldCheck, ExternalLink } from 'lucide-react';
 import { getFreelancerOrders } from '@/lib/db';
 import { getFreelancerReputation, ReputationData } from '@/lib/contract';

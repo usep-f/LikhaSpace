@@ -6,7 +6,7 @@ import { GigsFeed } from '@/components/GigsFeed';
 import { ProfileModal } from '@/components/ProfileModal';
 import { BookingModal } from '@/components/BookingModal';
 import { LoginModal } from '@/components/LoginModal';
-import { Gig, FreelancerProfile, Order } from '@/lib/mockGigs';
+import { Gig, FreelancerProfile, Order } from '@/lib/types';
 import { useNotification } from '@/context/NotificationContext';
 import { useWallet } from '@/context/WalletContext';
 import { createOrder, getUserProfile } from '@/lib/db';
@@ -73,7 +73,11 @@ function GigsContent() {
         priceUSD: gig.priceUSD,
         proposalText: message,
         progressPercentage: 0,
-        changelogs: [],
+        changelogs: [{
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          message: 'Booking request sent to freelancer.'
+        }],
         chatMessages: [],
         milestones: gig.milestones || [],
       };

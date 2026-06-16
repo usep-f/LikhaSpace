@@ -1,7 +1,7 @@
 'use client';
 
 import { X, AlertTriangle } from 'lucide-react';
-import { Order } from '@/lib/mockGigs';
+import { Order } from '@/lib/types';
 
 export interface CancelModalProps {
   order: Order;

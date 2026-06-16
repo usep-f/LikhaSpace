@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Gig, MilestoneConfig } from '@/lib/mockGigs';
+import { Gig, MilestoneConfig } from '@/lib/types';
 import { X, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { gigSchema, sanitizeInput } from '@/lib/validation';
 import { useNotification } from '@/context/NotificationContext';

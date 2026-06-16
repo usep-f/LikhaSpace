@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, ShieldAlert, Coins } from 'lucide-react';
-import { Order } from '@/lib/mockGigs';
+import { Order } from '@/lib/types';
 import { useNotification } from '@/context/NotificationContext';
 import { updateOrderStatus } from '@/lib/db';
 import { getLockedBalance, resolveDispute } from '@/lib/contract';
@@ -71,6 +71,7 @@ export const ResolveDisputeModal: React.FC<ResolveDisputeModalProps> = ({
 
       await updateOrderStatus(order.id, {
         status: 'settled_dispute',
+        progressPercentage: 100,
         changelogs: [...(order.changelogs || []), newChangelog],
       });
 

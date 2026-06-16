@@ -90,6 +90,7 @@ export interface ChatMessage {
   timestamp: string;
 }
 
-export const mockProfiles: Record<string, FreelancerProfile> = {};
-export const mockGigs: Gig[] = [];
-export const mockOrders: Order[] = [];
+// Mock exports for testing/prototype fallback if needed:
+// export const mockProfiles: Record<string, FreelancerProfile> = {};
+// export const types: Gig[] = [];
+// export const mockOrders: Order[] = [];

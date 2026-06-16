@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Order, ChatMessage } from '@/lib/mockGigs';
+import { Order, ChatMessage } from '@/lib/types';
 import { X, Send } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';

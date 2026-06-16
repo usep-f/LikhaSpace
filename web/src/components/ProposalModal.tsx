@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Order, Gig } from '@/lib/mockGigs';
+import { Order, Gig } from '@/lib/types';
 import { X, User, Briefcase, FileText } from 'lucide-react';
 import { getGig } from '@/lib/db';
 

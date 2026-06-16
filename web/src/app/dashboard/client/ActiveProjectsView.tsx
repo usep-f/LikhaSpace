@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
 import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, ShieldAlert } from 'lucide-react';
-import { Order, Gig } from '@/lib/mockGigs';
+import { Order, Gig } from '@/lib/types';
 import { ChatModal } from '@/components/ChatModal';
 import { DeliverablesModal } from '@/components/DeliverablesModal';
 import { StatusModal } from '@/components/StatusModal';
@@ -123,12 +123,19 @@ export const ActiveProjectsView: React.FC = () => {
         state: 'active' as const
       }];
 
+      const newChangelog = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        message: 'Escrow contract deployed and funded on-chain. Project work is now active!'
+      };
+
       await updateOrderStatus(order.id, { 
         status: 'escrow_funded', 
         txHash: contractId,
         milestones: defaultMilestones,
         currentMilestoneIdx: 0,
-        progressPercentage: 0
+        progressPercentage: 0,
+        changelogs: [...(order.changelogs || []), newChangelog]
       });
       showToast('Escrow Successfully Funded!', 'success');
     } catch (e: unknown) {
@@ -181,6 +188,7 @@ export const ActiveProjectsView: React.FC = () => {
 
       await updateOrderStatus(order.id, {
         status: 'denied',
+        progressPercentage: 100,
         changelogs: [...(order.changelogs || []), newChangelog]
       });
 
