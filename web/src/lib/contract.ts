@@ -17,6 +17,7 @@ import {
 
 export const ESCROW_WASM_ID = process.env.NEXT_PUBLIC_ESCROW_WASM_ID!;
 export const ORACLE_ID = process.env.NEXT_PUBLIC_ORACLE_ID!;
+export const REPUTATION_CONTRACT_ID = process.env.NEXT_PUBLIC_REPUTATION_CONTRACT_ID!;
 export const TESTNET_XLM = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC'; // Standard testnet Native asset SAC
 
 // Mock Mediator logic: In a real app this would come from Firebase
@@ -135,6 +136,7 @@ async function initializeEscrowContract(
       new Address(ORACLE_ID).toScVal(),
       new Address(DEFAULT_MEDIATOR).toScVal(),
       new Address(PLATFORM_TREASURY).toScVal(),
+      new Address(REPUTATION_CONTRACT_ID).toScVal(),
       nativeToScVal(BigInt(paidRevisionPriceUsd), { type: 'i128' }),
       buildMilestonesScVal(milestones)
     ));
@@ -435,3 +437,72 @@ export async function resolveDispute(
 
   return submitTransaction(txBuilder);
 }
+
+export async function submitReviewTransaction(
+  clientAddress: string,
+  freelancerAddress: string,
+  rating: number,
+  reviewText: string
+) {
+  const account = await server.getAccount(clientAddress);
+  const contract = new Contract(REPUTATION_CONTRACT_ID);
+  
+  const txBuilder = new TransactionBuilder(account, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+    .addOperation(
+      contract.call('add_review',
+        new Address(clientAddress).toScVal(),
+        new Address(freelancerAddress).toScVal(),
+        xdr.ScVal.scvU32(rating),
+        xdr.ScVal.scvString(reviewText)
+      )
+    );
+
+  return submitTransaction(txBuilder);
+}
+
+export interface ReputationData {
+  projectsCompleted: number;
+  totalEarnedStroops: bigint;
+  ratingSum: number;
+  ratingCount: number;
+  reviews: Array<{
+    client: string;
+    rating: number;
+    text: string;
+    timestamp: number;
+  }>;
+}
+
+export async function getFreelancerReputation(freelancerAddress: string): Promise<ReputationData | null> {
+  try {
+    const account = await server.getAccount(freelancerAddress);
+    const tx = new TransactionBuilder(account, { fee: '100', networkPassphrase: NETWORK_PASSPHRASE })
+      .addOperation(new Contract(REPUTATION_CONTRACT_ID).call('get_reputation', new Address(freelancerAddress).toScVal()))
+      .setTimeout(30).build();
+      
+    const sim = await server.simulateTransaction(tx);
+    if (rpc.Api.isSimulationSuccess(sim) && sim.result) {
+      const native = scValToNative(sim.result.retval);
+      if (native && typeof native === 'object') {
+        const reviews = Array.isArray(native.reviews) ? native.reviews.map((r: any) => ({
+          client: r.client?.toString() || '',
+          rating: Number(r.rating || 0),
+          text: r.text || '',
+          timestamp: Number(r.timestamp || 0)
+        })) : [];
+        
+        return {
+          projectsCompleted: Number(native.projects_completed || 0),
+          totalEarnedStroops: BigInt(native.total_earned_stroops || 0),
+          ratingSum: Number(native.rating_sum || 0),
+          ratingCount: Number(native.rating_count || 0),
+          reviews
+        };
+      }
+    }
+  } catch (e) {
+    console.error('Failed to query getFreelancerReputation:', e);
+  }
+  return null;
+}
+

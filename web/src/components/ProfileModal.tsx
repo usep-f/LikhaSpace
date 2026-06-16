@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FreelancerProfile, Order } from '@/lib/mockGigs';
 import { X, Star, CheckCircle, ShieldCheck, ExternalLink } from 'lucide-react';
 import { getFreelancerOrders } from '@/lib/db';
+import { getFreelancerReputation, ReputationData } from '@/lib/contract';
 
 interface ProfileModalProps {
   profile: FreelancerProfile;
@@ -10,26 +11,52 @@ interface ProfileModalProps {
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose }) => {
   const [completedOrdersWithReviews, setCompletedOrdersWithReviews] = useState<Order[]>([]);
+  const [onChainReputation, setOnChainReputation] = useState<ReputationData | null>(null);
+  const [isLoadingRep, setIsLoadingRep] = useState(true);
 
   useEffect(() => {
+    // Fetch mock orders for legacy display
     getFreelancerOrders(profile.address)
       .then((orders) => {
         const withReviews = orders.filter(o => o.status === 'completed' && o.review);
         setCompletedOrdersWithReviews(withReviews);
       })
       .catch(console.error);
+
+    // Fetch true on-chain reputation stats
+    getFreelancerReputation(profile.address)
+      .then((rep) => {
+        setOnChainReputation(rep);
+      })
+      .catch(console.error)
+      .finally(() => setIsLoadingRep(false));
   }, [profile.address]);
 
   const allReviews = [
-    ...(profile.testimonials || []).map(t => ({ id: t.id, clientName: t.clientName, rating: t.rating, text: t.text, txHash: undefined })),
+    ...(profile.testimonials || []).map(t => ({ id: t.id, clientName: t.clientName, rating: t.rating, text: t.text, txHash: undefined, onChain: false })),
     ...completedOrdersWithReviews.map(o => ({
       id: o.id,
       clientName: o.clientName,
       rating: o.review!.rating,
       text: o.review!.text,
-      txHash: o.txHash
+      txHash: o.txHash,
+      onChain: false
+    })),
+    ...(onChainReputation?.reviews || []).map((r, i) => ({
+      id: `chain-${i}`,
+      clientName: `${r.client.slice(0, 4)}...${r.client.slice(-4)}`,
+      rating: r.rating,
+      text: r.text,
+      txHash: undefined,
+      onChain: true
     }))
   ];
+
+  const projectsCompleted = onChainReputation ? onChainReputation.projectsCompleted : profile.projectsCompleted;
+  const totalEarnedXLM = onChainReputation ? Number(onChainReputation.totalEarnedStroops) / 10000000 : profile.totalEarnedXLM;
+  const averageRating = onChainReputation && onChainReputation.ratingCount > 0 
+    ? (onChainReputation.ratingSum / onChainReputation.ratingCount).toFixed(1)
+    : profile.averageRating;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-obsidian/80 backdrop-blur-sm">
@@ -68,7 +95,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose }) 
             <div className="pb-1 text-right">
               <div className="flex items-center justify-end space-x-1 text-yellow-400 font-bold text-sm">
                 <Star className="w-4 h-4 fill-current" />
-                <span>{profile.averageRating} Rating</span>
+                <span>{averageRating} Rating</span>
               </div>
               <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-1">Based on reviews</p>
             </div>
@@ -78,19 +105,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose }) 
           <p className="text-xs text-gray-400 leading-relaxed mb-6">{profile.bio}</p>
 
           {/* On-Chain Stats Grid */}
-          <h3 className="text-[10px] uppercase font-bold tracking-widest text-gray-500 mb-3">On-Chain Reputation</h3>
+          <h3 className="text-[10px] uppercase font-bold tracking-widest text-gray-500 mb-3 flex items-center gap-2">
+            On-Chain Reputation
+            {isLoadingRep && <span className="text-neoncyan animate-pulse">Loading...</span>}
+          </h3>
           <div className="grid grid-cols-2 gap-4 mb-8">
-             <div className="bg-obsidian border border-white/5 p-4 rounded-xl">
+             <div className="bg-obsidian border border-white/5 p-4 rounded-xl relative overflow-hidden">
+               {onChainReputation && <div className="absolute top-0 right-0 p-1 bg-neoncyan/10 rounded-bl-lg"><ShieldCheck className="w-3 h-3 text-neoncyan" /></div>}
                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Projects Completed</p>
                <p className="text-xl font-bold text-white font-heading flex items-center gap-2">
                  <CheckCircle className="w-4 h-4 text-neongreen" />
-                 {profile.projectsCompleted}
+                 {projectsCompleted}
                </p>
              </div>
-             <div className="bg-obsidian border border-white/5 p-4 rounded-xl">
+             <div className="bg-obsidian border border-white/5 p-4 rounded-xl relative overflow-hidden">
+               {onChainReputation && <div className="absolute top-0 right-0 p-1 bg-neoncyan/10 rounded-bl-lg"><ShieldCheck className="w-3 h-3 text-neoncyan" /></div>}
                <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Total Earned</p>
                <p className="text-xl font-bold text-neongreen text-glow-green font-heading">
-                 {profile.totalEarnedXLM.toLocaleString()} XLM
+                 {totalEarnedXLM.toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM
                </p>
              </div>
           </div>
@@ -104,8 +136,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ profile, onClose }) 
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-bold text-white flex items-center gap-1">
                       {t.clientName}
-                      {t.txHash && (
-                        <span className="flex items-center text-[9px] text-neongreen bg-neongreen/10 px-1.5 py-0.5 rounded gap-0.5 ml-2" title={`Verified Tx: ${t.txHash}`}>
+                      {(t.txHash || t.onChain) && (
+                        <span className="flex items-center text-[9px] text-neongreen bg-neongreen/10 px-1.5 py-0.5 rounded gap-0.5 ml-2" title={t.txHash ? `Verified Tx: ${t.txHash}` : 'Verified On-Chain'}>
                           <ShieldCheck className="w-2.5 h-2.5" />
                           On-Chain
                         </span>
