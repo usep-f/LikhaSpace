@@ -2,8 +2,14 @@
 
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env, String,
-    Vec,
+    Symbol, Vec,
 };
+
+soroban_sdk::contractmeta!(
+    key = "Description",
+    val = "Immutable freelancer reputation ledger and review registry for LikhaSpace"
+);
+
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -125,7 +131,12 @@ impl LikhaReputation {
         // Extend TTL for the freelancer's persistent record
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Reputation(freelancer), 120_960, 518_400);
+            .extend_ttl(&DataKey::Reputation(freelancer.clone()), 120_960, 518_400);
+
+        env.events().publish(
+            (Symbol::new(&env, "reputation"), Symbol::new(&env, "project_recorded")),
+            (freelancer, earned_amount)
+        );
     }
 
     pub fn add_review(
@@ -146,7 +157,7 @@ impl LikhaReputation {
         rep.rating_count += 1;
 
         let review = Review {
-            client,
+            client: client.clone(),
             rating,
             text,
             timestamp: env.ledger().timestamp(),
@@ -159,7 +170,12 @@ impl LikhaReputation {
             
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Reputation(freelancer), 120_960, 518_400);
+            .extend_ttl(&DataKey::Reputation(freelancer.clone()), 120_960, 518_400);
+
+        env.events().publish(
+            (Symbol::new(&env, "reputation"), Symbol::new(&env, "review_added")),
+            (freelancer, client, rating)
+        );
     }
 
     pub fn get_reputation(env: Env, freelancer: Address) -> ReputationData {
