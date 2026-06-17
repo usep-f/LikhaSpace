@@ -1,6 +1,12 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol};
 
+soroban_sdk::contractmeta!(
+    key = "Description",
+    val = "Testnet mockup of Reflector Oracle Network returning fluctuating XLM/USD conversion rates"
+);
+
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Asset {

@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Env, String};
+use soroban_sdk::{testutils::{Address as _, Events}, Env, String, Symbol, IntoVal};
 
 #[test]
 fn test_initialize_and_set_escrow() {
@@ -38,6 +38,18 @@ fn test_record_project() {
 
     client.record_project(&escrow, &freelancer, &1000);
 
+    // Verify reputation project_recorded event
+    let events = env.events().all();
+    let last_event = events.last().unwrap();
+    assert_eq!(
+        last_event.1,
+        soroban_sdk::vec![
+            &env,
+            Symbol::new(&env, "reputation").into_val(&env),
+            Symbol::new(&env, "project_recorded").into_val(&env)
+        ]
+    );
+
     let rep = client.get_reputation(&freelancer);
     assert_eq!(rep.projects_completed, 1);
     assert_eq!(rep.total_earned_stroops, 1000);
@@ -59,6 +71,18 @@ fn test_add_review() {
 
     let review_text = String::from_str(&env, "Great work!");
     client.add_review(&client_addr, &freelancer, &5, &review_text);
+
+    // Verify reputation review_added event
+    let events = env.events().all();
+    let last_event = events.last().unwrap();
+    assert_eq!(
+        last_event.1,
+        soroban_sdk::vec![
+            &env,
+            Symbol::new(&env, "reputation").into_val(&env),
+            Symbol::new(&env, "review_added").into_val(&env)
+        ]
+    );
 
     let rep = client.get_reputation(&freelancer);
     assert_eq!(rep.rating_sum, 5);
