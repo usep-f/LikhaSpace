@@ -8,7 +8,7 @@ import {
 } from '@stellar/stellar-sdk';
 import { server, NETWORK_PASSPHRASE } from './stellar';
 
-export const REPUTATION_CONTRACT_ID = process.env.NEXT_PUBLIC_REPUTATION_CONTRACT_ID!;
+import { REPUTATION_CONTRACT_ID } from './contractConstants';
 
 export interface ReputationData {
   projectsCompleted: number;

@@ -9,8 +9,6 @@ import {
 import { server, NETWORK_PASSPHRASE } from './stellar';
 import { submitTransaction } from './stellarUtils';
 
-export const DEFAULT_MEDIATOR = process.env.NEXT_PUBLIC_MEDIATOR_ADDRESS || 'GAFBCLO24QMPVXFZJHVLRG6CKAGBJEMCW57UG45SS7PQ2LGMZTGY7DGX';
-
 export interface DisputeProposal {
   proposer: string;
   freelancerPayout: bigint;
