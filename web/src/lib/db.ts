@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot, arrayUnion } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { db } from './firebase';
 import { Order, Gig } from './types'; // Reusing the interfaces from types
 
@@ -19,6 +19,10 @@ export async function getGig(gigId: string): Promise<Gig | null> {
 
 export async function updateGig(gigId: string, updates: Partial<Gig>) {
   await updateDoc(doc(db, 'gigs', gigId), updates);
+}
+
+export async function deleteGig(gigId: string) {
+  await deleteDoc(doc(db, 'gigs', gigId));
 }
 
 export async function getUserProfile(address: string) {
