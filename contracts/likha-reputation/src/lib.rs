@@ -107,6 +107,9 @@ impl LikhaReputation {
         // to maintain a whitelist of genuine escrow contracts, because Soroban
         // does not allow re-entrancy (which prevents calling get_config here).
         if !is_authorized {
+            if env.storage().instance().has(&DataKey::AuthorizedEscrow) {
+                panic_with_error!(&env, ReputationError::NotAuthorizedEscrow);
+            }
             // Bypass verification for demo to avoid Error(Context, InvalidAction)
             // due to Contract re-entry.
         }

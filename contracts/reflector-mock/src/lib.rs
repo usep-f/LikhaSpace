@@ -27,10 +27,19 @@ impl ReflectorMock {
     pub fn lastprice(env: Env, asset: Asset) -> Option<PriceFeed> {
         match asset {
             Asset::Other(sym) if sym == symbol_short!("XLM") => {
+                let base_price = 10_000_000_000_000i128; // $0.10 USD
+                let timestamp = env.ledger().timestamp() as i64;
+                
+                // Create a 10-minute (600s) cyclical wave that varies the price 
+                // by +/- 20% (between $0.08 and $0.12 USD).
+                // cycle range: [-300, 299]
+                let cycle = (timestamp % 600) - 300; 
+                // Scale factor: 300 * 6_666_666_666 = 2_000_000_000_000 ($0.02 USD)
+                let variation = (cycle as i128) * 6_666_666_666;
+                let price = base_price + variation;
+
                 Some(PriceFeed {
-                    // Default: 1 XLM = $0.10 USD (10 cents). 
-                    // Since decimals = 14, 0.10 USD is 10_000_000_000_000 (10^13)
-                    price: 10_000_000_000_000,
+                    price,
                     timestamp: env.ledger().timestamp(),
                 })
             }
@@ -38,3 +47,7 @@ impl ReflectorMock {
         }
     }
 }
+
+#[cfg(test)]
+mod test;
+
