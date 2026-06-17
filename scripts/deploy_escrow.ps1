@@ -26,10 +26,9 @@ $AdminAddress = (stellar keys address $Identity).Trim()
 Write-Host "Building contracts..."
 stellar contract build
 
-# 3. Deploy Reflector Mock Oracle to testnet
-Write-Host "Deploying Reflector Mock Oracle to $Network..."
-$OracleId = (stellar contract deploy --wasm $ReflectorWasm --source-account $Identity --network $Network).Trim()
-Write-Host "Deployed Oracle ID: $OracleId"
+# 3. Use Blend Testnet Mock Oracle (which tracks actual native XLM testnet prices)
+$OracleId = "CAZOKR2Y5E2OSWSIBRVZMJ47RUTQPIGVWSAQ2UISGAVC46XKPGDG5PKI"
+Write-Host "Using Blend Testnet Mock Oracle ID: $OracleId"
 
 # 4. Install Likha Escrow WASM to testnet
 Write-Host "Installing Likha Escrow WASM to $Network..."
