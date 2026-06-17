@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Order } from '@/lib/mockGigs';
+import { Order } from '@/lib/types';
 import { X, UploadCloud, Link as LinkIcon, FileText } from 'lucide-react';
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes } from 'firebase/storage';

@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { ShieldCheck } from 'lucide-react';
-import { Order, Gig } from '@/lib/mockGigs';
+import { Order, Gig } from '@/lib/types';
 import { getClientOrders, getGig } from '@/lib/db';
+import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 
 export const HistoryView: React.FC = () => {
   const { address } = useWallet();
@@ -55,10 +56,14 @@ export const HistoryView: React.FC = () => {
                        {order.status === 'completed' ? 'Completed Order' : 
                         order.status === 'settled_dispute' ? 'Settled Dispute' : 'Cancelled Order'}
                      </p>
-                    <p className="text-sm font-bold text-white flex items-center gap-1">
-                      Freelancer: {order.gigInfo?.freelancerName || order.freelancerAddress}
+                    <div className="flex items-center gap-1 mb-1">
+                      <UserWalletInfo
+                        address={order.freelancerAddress}
+                        role="freelancer"
+                        fallbackName={order.gigInfo?.freelancerName}
+                      />
                       <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
-                    </p>
+                    </div>
                     <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
                  </div>
                  <div className="text-right">

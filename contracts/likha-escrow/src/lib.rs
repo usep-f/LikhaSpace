@@ -1,8 +1,17 @@
 #![no_std]
 
+#[cfg(test)]
+extern crate std;
+
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, token, Address, Env, IntoVal, Symbol, Vec,
 };
+
+soroban_sdk::contractmeta!(
+    key = "Description",
+    val = "On-chain milestone escrow contract for LikhaSpace freelancer marketplace"
+);
+
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -80,6 +89,7 @@ pub struct EscrowConfig {
     pub oracle: Address,
     pub mediator: Address,
     pub treasury: Address,
+    pub reputation_contract: Address,
     pub paid_revision_price_usd: i128,
 }
 
@@ -177,10 +187,13 @@ impl LikhaEscrow {
         oracle: Address,
         mediator: Address,
         treasury: Address,
+        reputation_contract: Address,
         paid_revision_price_usd: i128,
         milestones: Vec<Milestone>,
     ) {
         client.require_auth();
+        #[cfg(test)]
+        std::println!("--- initialize called inside contract impl ---");
         if env.storage().instance().has(&DataKey::Config) {
             panic_with_error!(&env, EscrowError::AlreadyInitialized);
         }
@@ -192,6 +205,7 @@ impl LikhaEscrow {
             oracle,
             mediator,
             treasury,
+            reputation_contract,
             paid_revision_price_usd,
         };
 
@@ -202,6 +216,16 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
         env.storage().instance().set(&DataKey::HasSubmittedOnce, &false);
         extend_instance_ttl(&env);
+
+        env.events().publish(
+            (Symbol::new(&env, "escrow"), Symbol::new(&env, "initialized")),
+            (config.client.clone(), config.freelancer.clone(), config.token.clone())
+        );
+        #[cfg(test)]
+        {
+            use soroban_sdk::testutils::Events;
+            std::println!("Events inside contract: {:?}", env.events().all());
+        }
     }
 
     pub fn fund(env: Env, client: Address, max_xlm_to_spend: i128) {
@@ -245,6 +269,11 @@ impl LikhaEscrow {
         }
 
         set_interaction(&env);
+
+        env.events().publish(
+            (Symbol::new(&env, "escrow"), Symbol::new(&env, "funded")),
+            (total_xlm_required, stroops_per_cent)
+        );
     }
 
     pub fn submit_deliverable(env: Env, freelancer: Address) {
@@ -269,6 +298,11 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::HasSubmittedOnce, &true);
         
         set_interaction(&env);
+
+        env.events().publish(
+            (Symbol::new(&env, "escrow"), Symbol::new(&env, "submitted")),
+            idx
+        );
     }
 
     pub fn accept_deliverable(env: Env, client: Address) {
@@ -306,9 +340,41 @@ impl LikhaEscrow {
         let token_client = token::Client::new(env, &config.token);
         token_client.transfer(&env.current_contract_address(), &config.freelancer, &payout_xlm);
         
+        // Update reputation
+        env.authorize_as_current_contract(soroban_sdk::vec![
+            env,
+            soroban_sdk::auth::InvokerContractAuthEntry::Contract(
+                soroban_sdk::auth::SubContractInvocation {
+                    context: soroban_sdk::auth::ContractContext {
+                        contract: config.reputation_contract.clone(),
+                        fn_name: Symbol::new(env, "record_project"),
+                        args: soroban_sdk::vec![
+                            env,
+                            env.current_contract_address().into_val(env),
+                            config.freelancer.clone().into_val(env),
+                            payout_xlm.into_val(env),
+                        ],
+                    },
+                    sub_invocations: soroban_sdk::vec![env],
+                },
+            ),
+        ]);
+
+        let _: () = env.invoke_contract(
+            &config.reputation_contract,
+            &Symbol::new(env, "record_project"),
+            soroban_sdk::vec![
+                env,
+                env.current_contract_address().into_val(env),
+                config.freelancer.clone().into_val(env),
+                payout_xlm.into_val(env)
+            ],
+        );
+        
         locked_xlm -= payout_xlm;
         env.storage().instance().set(&DataKey::LockedXlmBalance, &locked_xlm);
         
+        let approved_idx = idx;
         idx += 1;
         if idx < milestones.len() as u32 {
             let mut next_m = milestones.get(idx).unwrap();
@@ -321,6 +387,11 @@ impl LikhaEscrow {
         
         env.storage().instance().set(&DataKey::Milestones, &milestones);
         set_interaction(env);
+
+        env.events().publish(
+            (Symbol::new(env, "escrow"), Symbol::new(env, "approved")),
+            (approved_idx, payout_xlm)
+        );
     }
 
     pub fn deny_deliverable(env: Env, client: Address) {
@@ -377,6 +448,11 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::Milestones, &milestones);
         
         set_interaction(&env);
+
+        env.events().publish(
+            (Symbol::new(&env, "escrow"), Symbol::new(&env, "revision_paid")),
+            revision_xlm
+        );
     }
 
     pub fn refund_remaining(env: Env, freelancer: Address) {
@@ -431,6 +507,11 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::Milestones, &milestones);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Disputed);
         set_interaction(&env);
+
+        env.events().publish(
+            (Symbol::new(&env, "escrow"), Symbol::new(&env, "disputed")),
+            env.ledger().timestamp()
+        );
     }
 
     pub fn escalate_to_mediator(env: Env, caller: Address) {
@@ -609,6 +690,11 @@ impl LikhaEscrow {
         env.storage().instance().set(&DataKey::LockedXlmBalance, &0i128);
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Settled);
         set_interaction(&env);
+
+        env.events().publish(
+            (Symbol::new(&env, "escrow"), Symbol::new(&env, "dispute_resolved")),
+            (freelancer_payout, client_refund)
+        );
     }
 
     pub fn get_dispute_proposal(env: Env) -> Option<DisputeProposal> {
@@ -673,6 +759,11 @@ impl LikhaEscrow {
 
         env.storage().instance().set(&DataKey::Status, &EscrowStatus::Cancelled);
         extend_instance_ttl(&env);
+
+        env.events().publish(
+            (Symbol::new(&env, "escrow"), Symbol::new(&env, "cancelled")),
+            caller
+        );
     }
 
     pub fn client_cancel_with_kill_fee(env: Env, client: Address) {

@@ -50,7 +50,15 @@ service cloud.firestore {
          || resource.data.freelancerAddress == request.auth.uid
          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mediator')
         && request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['status', 'changelogs', 'chatMessages', 'currentMilestoneIdx', 'milestones', 'denialMessage', 'txHash', 'progressPercentage', 'review', 'hasSubmittedOnce']);
+           .hasOnly(['status', 'changelogs', 'chatMessages', 'currentMilestoneIdx', 'milestones', 'denialMessage', 'txHash', 'progressPercentage', 'review', 'hasSubmittedOnce'])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['chatMessages'])
+          || (
+            request.resource.data.get('chatMessages', []).size() == resource.data.get('chatMessages', []).size() + 1
+            && request.resource.data.get('chatMessages', []).hasAll(resource.data.get('chatMessages', []))
+            && request.resource.data.get('chatMessages', [])[resource.data.get('chatMessages', []).size()].senderAddress == request.auth.uid
+          )
+        );
 
       // Deletion not permitted — orders are permanent audit records
       allow delete: if false;

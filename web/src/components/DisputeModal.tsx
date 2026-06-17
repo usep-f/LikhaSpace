@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, Flame, ShieldAlert, Coins, Clock } from 'lucide-react';
-import { Order } from '@/lib/mockGigs';
+import { Order } from '@/lib/types';
 import { useNotification } from '@/context/NotificationContext';
 import { updateOrderStatus } from '@/lib/db';
 import {
@@ -113,6 +113,7 @@ export const DisputeModal: React.FC<DisputeModalProps> = ({
 
       await updateOrderStatus(order.id, {
         status: 'settled_dispute',
+        progressPercentage: 100,
         changelogs: [...(order.changelogs || []), newChangelog],
       });
 
@@ -140,6 +141,7 @@ export const DisputeModal: React.FC<DisputeModalProps> = ({
 
       await updateOrderStatus(order.id, {
         status: 'denied',
+        progressPercentage: 100,
         changelogs: [...(order.changelogs || []), newChangelog],
       });
 
@@ -167,6 +169,7 @@ export const DisputeModal: React.FC<DisputeModalProps> = ({
 
       await updateOrderStatus(order.id, {
         status: 'settled_dispute',
+        progressPercentage: 100,
         changelogs: [...(order.changelogs || []), newChangelog],
       });
 

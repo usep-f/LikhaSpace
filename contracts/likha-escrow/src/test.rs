@@ -1,12 +1,22 @@
 #![cfg(test)]
 
+extern crate std;
+
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _, storage::Instance as _}, token, Address, Env,
+    testutils::{Address as _, Ledger as _, storage::Instance as _, Events}, token, Address, Env, Symbol, IntoVal,
 };
 
 #[contract]
 struct LocalOracleMock;
+
+#[contract]
+struct MockReputation;
+
+#[contractimpl]
+impl MockReputation {
+    pub fn record_project(_env: Env, _escrow: Address, _freelancer: Address, _amount: i128) {}
+}
 
 #[contractimpl]
 impl LocalOracleMock {
@@ -22,7 +32,7 @@ impl LocalOracleMock {
     }
 }
 
-fn setup_test_env(env: &Env) -> (Address, Address, Address, Address, Address, Address, LikhaEscrowClient<'static>) {
+fn setup_test_env(env: &Env) -> (Address, Address, Address, Address, Address, Address, Address, LikhaEscrowClient<'_>) {
     env.mock_all_auths();
     let contract_id = env.register(LikhaEscrow, ());
     let client = LikhaEscrowClient::new(env, &contract_id);
@@ -38,14 +48,28 @@ fn setup_test_env(env: &Env) -> (Address, Address, Address, Address, Address, Ad
     let oracle = env.register(LocalOracleMock, ());
     let mediator = Address::generate(env);
     let treasury = Address::generate(env);
+    
+    // Register reputation mock
+    let reputation = env.register(MockReputation, ());
 
-    (freelancer, client_addr, token, oracle, mediator, treasury, client)
+    (freelancer, client_addr, token, oracle, mediator, treasury, reputation, client)
 }
 
 #[test]
 fn test_initialization() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    env.mock_all_auths();
+    let contract_id = env.register(LikhaEscrow, ());
+    let client = LikhaEscrowClient::new(&env, &contract_id);
+
+    let freelancer = Address::generate(&env);
+    let client_addr = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(token_admin);
+    let oracle = env.register(LocalOracleMock, ());
+    let mediator = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let reputation_contract = env.register(MockReputation, ());
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 10000,
@@ -61,8 +85,21 @@ fn test_initialization() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000, // revision $10
         &milestones,
+    );
+
+    // Verify initialization event
+    let events = env.events().all();
+    let last_event = events.last().unwrap();
+    assert_eq!(
+        last_event.1,
+        soroban_sdk::vec![
+            &env,
+            Symbol::new(&env, "escrow").into_val(&env),
+            Symbol::new(&env, "initialized").into_val(&env)
+        ]
     );
 
     let config = client.get_config();
@@ -74,7 +111,7 @@ fn test_initialization() {
 #[test]
 fn test_cancel_unfunded() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 10000,
@@ -90,6 +127,7 @@ fn test_cancel_unfunded() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -97,13 +135,26 @@ fn test_cancel_unfunded() {
     // Cancel by client
     env.mock_all_auths();
     client.cancel_unfunded(&client_addr);
+
+    // Verify cancelled event
+    let events = env.events().all();
+    let last_event = events.last().unwrap();
+    assert_eq!(
+        last_event.1,
+        soroban_sdk::vec![
+            &env,
+            Symbol::new(&env, "escrow").into_val(&env),
+            Symbol::new(&env, "cancelled").into_val(&env)
+        ]
+    );
+
     assert_eq!(client.get_status(), EscrowStatus::Cancelled);
 }
 
 #[test]
 fn test_cancel_unfunded_by_freelancer() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 10000,
@@ -119,6 +170,7 @@ fn test_cancel_unfunded_by_freelancer() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -132,7 +184,7 @@ fn test_cancel_unfunded_by_freelancer() {
 #[test]
 fn test_client_cancel_with_kill_fee() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, 
         Milestone {
@@ -156,6 +208,7 @@ fn test_client_cancel_with_kill_fee() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -188,7 +241,7 @@ fn test_client_cancel_with_kill_fee() {
 #[test]
 fn test_freelancer_cancel() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, 
         Milestone {
@@ -206,6 +259,7 @@ fn test_freelancer_cancel() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -228,7 +282,7 @@ fn test_freelancer_cancel() {
 #[test]
 fn test_p2p_dispute_proposal_and_accept() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 15000, // Changed to 15000 so locked balance matches old test (15B stroops)
@@ -244,6 +298,7 @@ fn test_p2p_dispute_proposal_and_accept() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -256,8 +311,33 @@ fn test_p2p_dispute_proposal_and_accept() {
     // Submit deliverable to unlock dispute logic
     client.submit_deliverable(&freelancer);
 
+    // Verify submitted event
+    let events_sub = env.events().all();
+    let last_event_sub = events_sub.last().unwrap();
+    assert_eq!(
+        last_event_sub.1,
+        soroban_sdk::vec![
+            &env,
+            Symbol::new(&env, "escrow").into_val(&env),
+            Symbol::new(&env, "submitted").into_val(&env)
+        ]
+    );
+
     // Request mediation (file dispute)
     client.request_mediation(&client_addr);
+
+    // Verify disputed event
+    let events = env.events().all();
+    let last_event = events.last().unwrap();
+    assert_eq!(
+        last_event.1,
+        soroban_sdk::vec![
+            &env,
+            Symbol::new(&env, "escrow").into_val(&env),
+            Symbol::new(&env, "disputed").into_val(&env)
+        ]
+    );
+
     assert_eq!(client.get_status(), EscrowStatus::Disputed);
 
     // Propose split (60% to freelancer, 40% to client)
@@ -287,7 +367,7 @@ fn test_p2p_dispute_proposal_and_accept() {
 #[test]
 fn test_p2p_dispute_proposal_and_reject() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 15000,
@@ -303,6 +383,7 @@ fn test_p2p_dispute_proposal_and_reject() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -338,7 +419,7 @@ fn test_p2p_dispute_proposal_and_reject() {
 #[test]
 fn test_p2p_dispute_timeout_50_50() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 15000,
@@ -354,6 +435,7 @@ fn test_p2p_dispute_timeout_50_50() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -391,7 +473,7 @@ fn test_p2p_dispute_timeout_50_50() {
 #[test]
 fn test_mediator_resolve_dispute() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 15000,
@@ -407,6 +489,7 @@ fn test_mediator_resolve_dispute() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -433,6 +516,18 @@ fn test_mediator_resolve_dispute() {
     
     client.resolve_dispute(&mediator, &f_payout, &c_refund);
 
+    // Verify dispute_resolved event
+    let events = env.events().all();
+    let last_event = events.last().unwrap();
+    assert_eq!(
+        last_event.1,
+        soroban_sdk::vec![
+            &env,
+            Symbol::new(&env, "escrow").into_val(&env),
+            Symbol::new(&env, "dispute_resolved").into_val(&env)
+        ]
+    );
+
     // Verify correct split
     assert_eq!(client.get_status(), EscrowStatus::Settled);
     let token_client = token::Client::new(&env, &token);
@@ -445,7 +540,7 @@ fn test_mediator_resolve_dispute() {
 #[should_panic]
 fn test_mediator_resolve_fails_before_escalation() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 15000,
@@ -461,6 +556,7 @@ fn test_mediator_resolve_fails_before_escalation() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -485,7 +581,7 @@ fn test_mediator_resolve_fails_before_escalation() {
 #[should_panic]
 fn test_escalation_blocks_p2p_propose() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 15000,
@@ -501,6 +597,7 @@ fn test_escalation_blocks_p2p_propose() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -528,7 +625,7 @@ fn test_escalation_blocks_p2p_propose() {
 #[test]
 fn test_ttl_extension() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 15000,
@@ -544,6 +641,7 @@ fn test_ttl_extension() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000, // revision $10
         &milestones,
     );
@@ -561,7 +659,7 @@ fn test_ttl_extension() {
 #[should_panic]
 fn test_request_mediation_fails_before_submission() {
     let env = Env::default();
-    let (freelancer, client_addr, token, oracle, mediator, treasury, client) = setup_test_env(&env);
+    let (freelancer, client_addr, token, oracle, mediator, treasury, reputation_contract, client) = setup_test_env(&env);
     
     let milestones = soroban_sdk::vec![&env, Milestone {
         payout_amount_usd: 15000,
@@ -577,6 +675,7 @@ fn test_request_mediation_fails_before_submission() {
         &oracle,
         &mediator,
         &treasury,
+        &reputation_contract,
         &1000,
         &milestones,
     );
@@ -589,3 +688,5 @@ fn test_request_mediation_fails_before_submission() {
     // Try to request mediation before any submission - should panic
     client.request_mediation(&client_addr);
 }
+
+
