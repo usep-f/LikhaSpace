@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc, deleteDoc, DocumentData } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, DocumentData, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
 import { useNotification } from './NotificationContext';
@@ -208,6 +208,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const docRef = doc(db, 'users', address);
       await deleteDoc(docRef);
+
+      const gigsQuery = query(collection(db, 'gigs'), where('freelancerAddress', '==', address));
+      const gigsSnap = await getDocs(gigsQuery);
+      
+      const deletePromises = gigsSnap.docs.map((docItem) => deleteDoc(docItem.ref));
+      await Promise.all(deletePromises);
+
       disconnectWallet();
     } catch (err: unknown) {
       console.error('Error soft-deleting profile:', err);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Gig } from '@/lib/mockGigs';
+import { Gig } from '@/lib/types';
 import { X, ShieldAlert, ArrowRight } from 'lucide-react';
 import { useNotification } from '@/context/NotificationContext';
 import { bookingMessageSchema, sanitizeInput } from '@/lib/validation';

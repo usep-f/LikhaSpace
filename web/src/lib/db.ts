@@ -1,6 +1,6 @@
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { db } from './firebase';
-import { Order, Gig } from './mockGigs'; // Reusing the interfaces from mockGigs
+import { Order, Gig } from './types'; // Reusing the interfaces from types
 
 /** GIGS */
 
@@ -15,6 +15,14 @@ export async function getGig(gigId: string): Promise<Gig | null> {
     return snap.data() as Gig;
   }
   return null;
+}
+
+export async function updateGig(gigId: string, updates: Partial<Gig>) {
+  await updateDoc(doc(db, 'gigs', gigId), updates);
+}
+
+export async function deleteGig(gigId: string) {
+  await deleteDoc(doc(db, 'gigs', gigId));
 }
 
 export async function getUserProfile(address: string) {
@@ -86,5 +94,18 @@ export function subscribeToMediatorOrders(callback: (orders: Order[]) => void) {
   const q = query(collection(db, 'orders'), where('status', 'in', ['disputed', 'mediation', 'settled_dispute']));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => d.data() as Order));
+  });
+}
+
+/** CHAT */
+
+export async function sendChatMessage(orderId: string, senderAddress: string, text: string) {
+  await updateDoc(doc(db, 'orders', orderId), {
+    chatMessages: arrayUnion({
+      id: crypto.randomUUID(),
+      senderAddress,
+      text,
+      timestamp: new Date().toISOString()
+    })
   });
 }

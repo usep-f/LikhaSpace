@@ -6,7 +6,7 @@ import { GigsFeed } from '@/components/GigsFeed';
 import { ProfileModal } from '@/components/ProfileModal';
 import { BookingModal } from '@/components/BookingModal';
 import { LoginModal } from '@/components/LoginModal';
-import { Gig, FreelancerProfile, Order } from '@/lib/mockGigs';
+import { Gig, FreelancerProfile, Order } from '@/lib/types';
 import { useNotification } from '@/context/NotificationContext';
 import { useWallet } from '@/context/WalletContext';
 import { createOrder, getUserProfile } from '@/lib/db';
@@ -30,7 +30,7 @@ function GigsContent() {
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   const { showToast } = useNotification();
-  const { address } = useWallet();
+  const { address, userProfile } = useWallet();
 
   const handleProfileClick = async (profileAddress: string) => {
     try {
@@ -67,13 +67,17 @@ function GigsContent() {
         id: orderId,
         gigId: gig.id,
         clientAddress: address,
-        clientName: 'Client (' + address.slice(0, 4) + '...' + address.slice(-4) + ')',
+        clientName: userProfile?.name || 'Client (' + address.slice(0, 4) + '...' + address.slice(-4) + ')',
         freelancerAddress: gig.freelancerAddress,
         status: 'pending_acceptance',
         priceUSD: gig.priceUSD,
         proposalText: message,
         progressPercentage: 0,
-        changelogs: [],
+        changelogs: [{
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          message: 'Booking request sent to freelancer.'
+        }],
         chatMessages: [],
         milestones: gig.milestones || [],
       };

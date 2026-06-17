@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Gig } from '@/lib/mockGigs';
+import { Gig } from '@/lib/types';
 import { Tag, HelpCircle, ArrowUpRight, Star, Search } from 'lucide-react';
 import { getAllGigs } from '@/lib/db';
 
@@ -52,11 +52,16 @@ const GigCard: React.FC<CardProps> = ({ gig,  onBookClick, onProfileClick }) => 
           {gig.title}
         </h3>
 
-        {gig.rating && (
+        {(gig.rating && gig.reviewsCount && gig.reviewsCount > 0) ? (
            <div className="flex items-center space-x-1 mt-2 text-xs text-yellow-400 font-bold">
              <Star className="w-3.5 h-3.5 fill-current" />
              <span>{gig.rating}</span>
              <span className="text-gray-500 font-normal">({gig.reviewsCount})</span>
+           </div>
+        ) : (
+           <div className="flex items-center space-x-1 mt-2 text-xs text-gray-500 font-bold">
+             <Star className="w-3.5 h-3.5 opacity-30" />
+             <span className="font-normal text-[10px] uppercase tracking-wider">No Reviews</span>
            </div>
         )}
         

@@ -106,6 +106,8 @@ export const bookingMessageSchema = z.object({
   message: z.string().trim().max(1000, 'Message cannot exceed 1000 characters').optional(),
 });
 
+
+
 // Deliverable Schema
 export const deliverableSchema = z.object({
   link: z.string().trim().url('Please enter a valid URL').or(z.literal('')).optional(),
@@ -115,4 +117,12 @@ export const deliverableSchema = z.object({
 // Denial Message Schema
 export const denialMessageSchema = z.object({
   message: z.string().trim().max(1000, 'Message cannot exceed 1000 characters').optional(),
+});
+
+// Chat Message Schema
+export const chatMessageSchema = z.object({
+  text: z.string().trim()
+    .min(1, 'Message cannot be empty.')
+    .max(2000, 'Message cannot exceed 2000 characters.')
+    .transform(sanitizeInput),
 });

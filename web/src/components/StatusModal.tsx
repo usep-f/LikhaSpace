@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order } from '@/lib/mockGigs';
+import { Order } from '@/lib/types';
 import { X, CheckCircle, Circle, ArrowRightCircle } from 'lucide-react';
 
 interface StatusModalProps {
@@ -106,9 +106,9 @@ export const StatusModal: React.FC<StatusModalProps> = ({ order, onClose }) => {
             </div>
           )}
 
-          {/* Freelancer Changelog */}
+          {/* Project Changelog */}
           <div className="bg-obsidian border border-white/5 rounded-xl p-4">
-            <h3 className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-4 pb-2 border-b border-white/5">Freelancer Changelog</h3>
+            <h3 className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-4 pb-2 border-b border-white/5">Project Changelog</h3>
 
             <div className="space-y-4">
               {order.changelogs && order.changelogs.length > 0 ? (
@@ -133,7 +133,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({ order, onClose }) => {
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-gray-500">The freelancer hasn&apos;t posted any updates yet.</p>
+                <p className="text-xs text-gray-500">No project updates have been posted yet.</p>
               )}
             </div>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Order, MilestoneConfig } from '@/lib/mockGigs';
+import { Order, MilestoneConfig } from '@/lib/types';
 import { X, ExternalLink, CheckCircle, AlertTriangle, Download, DollarSign } from 'lucide-react';
 import { storage } from '@/lib/firebase';
 import { ref, getDownloadURL } from 'firebase/storage';
@@ -23,8 +23,8 @@ export const DeliverablesModal: React.FC<DeliverablesModalProps> = ({ order, onC
 
   const title = milestone ? `Review Milestone: ${milestone.title}` : 'Review Deliverables';
   
-  const link = milestone?.deliverablesLink || order.deliverablesLink;
-  const notes = milestone?.deliverableNotes || order.deliverableNotes;
+  const link = milestone?.deliverablesLink;
+  const notes = milestone?.deliverableNotes;
   const storagePath = milestone?.deliverablesStoragePath;
   const fileName = milestone?.deliverablesFileName;
 
