@@ -129,12 +129,12 @@ pub struct PriceFeed {
     pub timestamp: u64,
 }
 
-fn get_stroops_per_cent(env: &Env, oracle: &Address) -> i128 {
+fn get_stroops_per_cent(env: &Env, oracle: &Address, token: &Address) -> i128 {
     let decimals: u32 = env.invoke_contract(oracle, &Symbol::new(env, "decimals"), soroban_sdk::vec![env]);
     let price_feed_opt: Option<PriceFeed> = env.invoke_contract(
         oracle,
         &Symbol::new(env, "lastprice"),
-        soroban_sdk::vec![env, Asset::Other(Symbol::new(env, "XLM")).into_val(env)],
+        soroban_sdk::vec![env, Asset::Stellar(token.clone()).into_val(env)],
     );
     if price_feed_opt.is_none() {
         panic_with_error!(env, EscrowError::OracleFeedNotFound);
@@ -243,7 +243,7 @@ impl LikhaEscrow {
         }
 
         // Oracle returns how many XLM stroops equals 1 USD cent.
-        let stroops_per_cent: i128 = get_stroops_per_cent(&env, &config.oracle);
+        let stroops_per_cent: i128 = get_stroops_per_cent(&env, &config.oracle, &config.token);
         let total_xlm_required = total_usd * stroops_per_cent;
         
         if total_xlm_required > max_xlm_to_spend {
@@ -429,7 +429,7 @@ impl LikhaEscrow {
         client.require_auth();
         check_status(&env, EscrowStatus::Funded);
 
-        let stroops_per_cent: i128 = get_stroops_per_cent(&env, &config.oracle);
+        let stroops_per_cent: i128 = get_stroops_per_cent(&env, &config.oracle, &config.token);
         let revision_xlm = config.paid_revision_price_usd * stroops_per_cent;
         if revision_xlm > max_xlm_to_spend {
             panic_with_error!(&env, EscrowError::SlippageExceeded);
