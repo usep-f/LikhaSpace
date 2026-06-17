@@ -2,58 +2,9 @@
 
 import React from 'react';
 import { useWallet } from '@/context/WalletContext';
-import { Search, ArrowRight, ShieldCheck, Coins, Send } from 'lucide-react';
+import { Search, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { LivePriceCard } from './ui/LivePriceCard';
-
-// Sub-component: Escrow Flow Chart Diagram (Right side)
-const EscrowFlowMockup: React.FC = () => (
-  <div className="relative w-full glass-card border border-white/10 rounded-2xl p-6 shadow-[0_0_30px_rgba(124,58,237,0.15)] flex flex-col justify-between space-y-6 overflow-hidden min-h-[350px]">
-    <div className="absolute -right-20 -top-20 w-48 h-48 rounded-full bg-hotpink/10 blur-3xl pointer-events-none" />
-    <div className="absolute -left-20 -bottom-20 w-48 h-48 rounded-full bg-neoncyan/10 blur-3xl pointer-events-none" />
-
-    <div className="flex items-center justify-between border-b border-white/5 pb-4">
-      <h3 className="font-heading font-bold text-xs uppercase tracking-widest text-hotpink text-glow-pink">
-        Escrow Ledger Protocol
-      </h3>
-      <span className="text-[10px] text-neongreen font-mono bg-neongreen/10 px-2 py-0.5 rounded-full border border-neongreen/20">
-        Active Contract
-      </span>
-    </div>
-
-    <div className="flex flex-col space-y-4 relative z-10">
-      <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-lg border border-white/5">
-        <div className="w-8 h-8 rounded-full bg-neoncyan/10 border border-neoncyan/40 flex items-center justify-center">
-          <Coins className="w-4 h-4 text-neoncyan" />
-        </div>
-        <div className="text-left">
-          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Step 1: Client Fund</p>
-          <p className="text-xs text-white">USD Budget conversion locked in XLM Escrow</p>
-        </div>
-      </div>
-
-        <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
-          <div className="w-8 h-8 rounded-full bg-hotpink/10 border border-hotpink/40 flex items-center justify-center">
-            <Send className="w-4 h-4 text-hotpink" />
-          </div>
-          <div>
-            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Step 2: Milestone Funding</p>
-            <p className="text-xs text-white">Funds are locked in escrow and paid out on delivery</p>
-          </div>
-        </div>
-
-      <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-lg border border-white/5">
-        <div className="w-8 h-8 rounded-full bg-neongreen/10 border border-neongreen/40 flex items-center justify-center">
-          <ShieldCheck className="w-4 h-4 text-neongreen" />
-        </div>
-        <div className="text-left">
-          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Step 3: Verification</p>
-          <p className="text-xs text-white">Work link review → balance released to Freelancer</p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
+import Image from 'next/image';
 
 // Sub-component: Search bar in Hero
 interface HeroSearchProps {
@@ -167,42 +118,57 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ searchVal, onSearchCha
   };
 
   return (
-    <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-white/5">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-        <div className="lg:col-span-7 space-y-6 text-left">
-          <div className="inline-flex px-3 py-1 rounded-full bg-hotpink/10 border border-hotpink/30 text-[10px] uppercase font-bold tracking-widest text-hotpink font-heading text-glow-pink">
-            Stellar-Powered Escrow Protocol
+    <section className="relative min-h-[90vh] lg:min-h-[85vh] flex items-center overflow-hidden border-b border-white/5 py-12 md:py-20 bg-obsidian">
+      {/* Background Image & Cyberpunk Gradient Overlays */}
+      <div className="absolute inset-0 z-0 select-none pointer-events-none">
+        <Image
+          src="/images/cyberpunk_hero_bg_user.jpg"
+          alt="Futuristic Cyberpunk Freelancer Workstation"
+          fill
+          className="object-cover object-right opacity-40 md:opacity-50 lg:opacity-75"
+          sizes="100vw"
+          priority
+        />
+        {/* Radial/Linear gradient masks for high text contrast */}
+        <div className="absolute inset-0 bg-gradient-to-r from-obsidian via-obsidian/95 to-transparent lg:via-obsidian/80 lg:to-transparent z-10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-obsidian via-transparent to-transparent z-10" />
+      </div>
+
+      {/* Hero Content Container */}
+      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          {/* Left Column: Headline and Actions (Constrained to fit the dark circuit board background) */}
+          <div className="lg:col-span-6 space-y-6 text-left z-20">
+            <div className="inline-flex px-3 py-1 rounded-full bg-hotpink/10 border border-hotpink/30 text-[10px] uppercase font-bold tracking-widest text-hotpink font-heading text-glow-pink">
+              Stellar-Powered Escrow Protocol
+            </div>
+            <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-none max-w-md sm:max-w-lg">
+              Trustless Work.<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-hotpink to-neoncyan text-glow-pink">
+                Zero Extraction Fees.
+              </span>
+            </h1>
+            <p className="text-base sm:text-lg text-gray-400 max-w-md sm:max-w-lg leading-relaxed">
+              LikhaSpace is the premier Filipino freelance engine bridging creative minds with global clients. Fund secure smart escrows, protect deliverables, and earn ratings on-chain.
+            </p>
+
+            <HeroSearch
+              searchVal={searchVal}
+              onChange={onSearchChange}
+              onSearchSubmit={handleSearchSubmit}
+            />
+
+            <HeroCTAs
+              isConnected={isConnected}
+              role={role}
+              onBrowse={() => router.push('/gigs')}
+              onDashboard={handleDashboardRedirect}
+              onConnect={handleConnectAction}
+            />
           </div>
-          <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-none">
-            Trustless Work.<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-hotpink to-neoncyan text-glow-pink">
-              Zero Extraction Fees.
-            </span>
-          </h1>
-          <p className="text-base sm:text-lg text-gray-400 max-w-2xl leading-relaxed">
-            LikhaSpace is the premier Filipino freelance engine bridging creative minds with global clients. Fund secure smart escrows, protect deliverables, and earn ratings on-chain.
-          </p>
 
-          <HeroSearch
-            searchVal={searchVal}
-            onChange={onSearchChange}
-            onSearchSubmit={handleSearchSubmit}
-          />
-
-          <HeroCTAs
-            isConnected={isConnected}
-            role={role}
-            onBrowse={() => router.push('/gigs')}
-            onDashboard={handleDashboardRedirect}
-            onConnect={handleConnectAction}
-          />
-        </div>
-
-        <div className="lg:col-span-5 w-full flex flex-col items-center gap-4">
-          <div className="w-full max-w-md">
-            <EscrowFlowMockup />
-          </div>
-          <LivePriceCard />
+          {/* Right Column: Left completely empty to showcase the freelancer illustration */}
+          <div className="hidden lg:col-span-6 lg:block" />
         </div>
       </div>
     </section>

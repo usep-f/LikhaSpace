@@ -7,8 +7,8 @@
 ---
 
 **Project:** LikhaSpace
-**Generated:** 2026-06-13 21:28:20
-**Category:** Marketplace (P2P)
+**Generated:** 2026-06-17 22:58:32
+**Category:** NFT/Web3 Platform
 
 ---
 
@@ -20,11 +20,11 @@
 |------|-----|--------------|
 | Primary | `#7C3AED` | `--color-primary` |
 | Secondary | `#A78BFA` | `--color-secondary` |
-| CTA/Accent | `#22C55E` | `--color-cta` |
-| Background | `#FAF5FF` | `--color-background` |
-| Text | `#4C1D95` | `--color-text` |
+| CTA/Accent | `#F43F5E` | `--color-cta` |
+| Background | `#0F0F23` | `--color-background` |
+| Text | `#E2E8F0` | `--color-text` |
 
-**Color Notes:** Trust purple + transaction green
+**Color Notes:** Neon purple + rose action
 
 ### Typography
 
@@ -68,7 +68,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #22C55E;
+  background: #F43F5E;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -99,7 +99,7 @@
 
 ```css
 .card {
-  background: #FAF5FF;
+  background: #0F0F23;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -153,28 +153,31 @@
 
 ## Style Guidelines
 
-**Style:** Vibrant & Block-based
+**Style:** Cyberpunk UI
 
-**Keywords:** Bold, energetic, playful, block layout, geometric shapes, high color contrast, duotone, modern, energetic
+**Keywords:** Neon, dark mode, terminal, HUD, sci-fi, glitch, dystopian, futuristic, matrix, tech noir
 
-**Best For:** Startups, creative agencies, gaming, social media, youth-focused, entertainment, consumer
+**Best For:** Gaming platforms, tech products, crypto apps, sci-fi applications, developer tools, entertainment
 
-**Key Effects:** Large sections (48px+ gaps), animated patterns, bold hover (color shift), scroll-snap, large type (32px+), 200-300ms
+**Key Effects:** Neon glow (text-shadow), glitch animations (skew/offset), scanlines (::before overlay), terminal fonts
 
 ### Page Pattern
 
-**Pattern Name:** Marketplace / Directory
+**Pattern Name:** Horizontal Scroll Journey
 
-- **Conversion Strategy:**  map hover pins,  card carousel, Search bar is the CTA. Reduce friction to search. Popular searches suggestions.
-- **CTA Placement:** Hero Search Bar + Navbar 'List your item'
-- **Section Order:** 1. Hero (Search focused), 2. Categories, 3. Featured Listings, 4. Trust/Safety, 5. CTA (Become a host/seller)
+- **Conversion Strategy:** Immersive product discovery. High engagement. Keep navigation visible.
+28,Bento Grid Showcase,bento,  grid,  features,  modular,  apple-style,  showcase", 1. Hero, 2. Bento Grid (Key Features), 3. Detail Cards, 4. Tech Specs, 5. CTA, Floating Action Button or Bottom of Grid, Card backgrounds: #F5F5F7 or Glass. Icons: Vibrant brand colors. Text: Dark., Hover card scale (1.02), video inside cards, tilt effect, staggered reveal, Scannable value props. High information density without clutter. Mobile stack.
+29,Interactive 3D Configurator,3d,  configurator,  customizer,  interactive,  product", 1. Hero (Configurator), 2. Feature Highlight (synced), 3. Price/Specs, 4. Purchase, Inside Configurator UI + Sticky Bottom Bar, Neutral studio background. Product: Realistic materials. UI: Minimal overlay., Real-time rendering, material swap animation, camera rotate/zoom, light reflection, Increases ownership feeling. 360 view reduces return rates. Direct add-to-cart.
+30,AI-Driven Dynamic Landing,ai,  dynamic,  personalized,  adaptive,  generative", 1. Prompt/Input Hero, 2. Generated Result Preview, 3. How it Works, 4. Value Prop, Input Field (Hero) + 'Try it' Buttons, Adaptive to user input. Dark mode for compute feel. Neon accents., Typing text effects, shimmering generation loaders, morphing layouts, Immediate value demonstration. 'Show, don't tell'. Low friction start.
+- **CTA Placement:** Floating Sticky CTA or End of Horizontal Track
+- **Section Order:** 1. Intro (Vertical), 2. The Journey (Horizontal Track), 3. Detail Reveal, 4. Vertical Footer
 
 ---
 
 ## Anti-Patterns (Do NOT Use)
 
-- ❌ Low trust signals
-- ❌ Confusing layout
+- ❌ Light mode default
+- ❌ No transaction status
 
 ### Additional Forbidden Patterns
 
