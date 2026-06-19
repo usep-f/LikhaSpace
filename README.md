@@ -1,55 +1,114 @@
 # LikhaSpace
 
-LikhaSpace is a decentralized, trustless freelance marketplace for Filipino creatives and global clients. It operates on a "Service Listing" (Fiverr-style) model, featuring automated smart contract escrows, zero platform extraction fees, and immutable on-chain reputation tracking.
+A Web3 Fiverr-style marketplace for Pinoy creatives featuring zero platform fees, flexible milestone escrows, and on-chain reviews to stop freelancers from getting scammed.
 
 ## Problem
-In the Philippines, the freelance and creative economy is a vital source of income. However, traditional freelance platforms extract heavy toll fees (ranging from 10% to 20% of hard-earned income), require slow, centralized payout procedures, and pose constant payment security risks for both clients and freelancers. Creatives face client payment defaults, while clients risk paying upfront for undelivered or substandard work.
-
-## The Solution: A Service Marketplace
-LikhaSpace flips the traditional bidding model. Instead of clients posting jobs and freelancers competing in a race to the bottom, **Freelancers post their services** (e.g., "I will design a 3D asset for $100"). Clients browse these services, review the freelancer's on-chain reliability, and book them directly.
+Here in the Philippines, many college students, self-taught designers, and young creatives do freelance work (like logo design, video editing, and copywriting) to help pay for school or buy their own gear. But using traditional platforms like Fiverr or Upwork is super hassle because they extract a big 20% commission cut from our hard-earned money, and withdrawing our funds takes forever. On top of that, there's a big risk of getting scammed: clients sometimes run away without paying after the artwork is submitted, and clients also worry about paying freelancers who just disappear.
 
 ## How It Works
-1. **Service Listings:** Freelancers create listings defining their service, price (in USD), and required upfront payment percentage (0-50%). These are indexed in Firebase.
-2. **Booking & Approval:** A Client finds a listing they like and sends a booking request. The Freelancer receives this request and can choose to **Accept** or **Deny** (with an optional denial message). Once accepted, that specific listing becomes temporarily *invisible/occupied* so the Freelancer can focus solely on that client.
-3. **Escrow Funding:** Upon acceptance, the Client funds the escrow by submitting a Soroban contract transaction. The USD price is automatically converted to live XLM value using a Reflector testnet oracle. The upfront payment is instantly dispatched to the Freelancer, and the remaining balance is locked in the `likha-escrow` smart contract.
-4. **Deliverables & Chat:** Clients and Freelancers can communicate via an off-chain chat (stored in Firebase). The Freelancer submits the final work deliverables through the dashboard.
-5. **Release or Dispute:**
-   - **Happy Path:** The Client reviews the deliverable and releases the remaining locked balance directly to the Freelancer via a smart contract call.
-   - **Dispute Path:** If a conflict arises, either party can file a dispute, routing the escrow to a decentralized Mediator for a settlement split.
-6. **Reputation Tracking:** Once a gig is completed, the Freelancer receives a Star Rating and Testimonial. This off-chain data is paired with their immutable on-chain stats (completed project count and total XLM earned) to prove absolute reliability.
+1. **Service Listings:** Freelancers post their service listing (e.g. Logo Design, $50) and can specify their own custom milestone payout schedule (e.g. Milestone 1: Sketch - $20, Milestone 2: Final Vector - $30).
+2. **Booking & Accepting:** A client finds the service they need, connects their Freighter wallet, and sends a booking request. The freelancer can either accept or deny the request.
+3. **Escrow Funding:** Once accepted, the client deposits the funds. The frontend queries our price oracle to convert the USD price to XLM, and deposits the exact XLM into a dynamically deployed milestone escrow contract. The first milestone is now active.
+4. **Milestone Submissions:** Freelancers upload their active milestone deliverables (saved in Firebase) and submit on-chain.
+5. **Releasing & Revisions:** The client reviews the deliverable. If they like it, they approve on-chain, releasing that milestone's XLM directly to the freelancer's wallet. If revisions are needed, they request it. Freelancers get a set amount of free revisions, and clients can purchase extra revisions if needed.
+6. **On-chain Reputation & Reviews:** When the project finishes, the client submits a review. This rating, review text, and timestamp are committed directly to the `likha-reputation` smart contract on-chain, updating the freelancer's profile stats (completed projects, total XLM earned, and reviews registry).
 
-## System Architecture
+## How It Uses Stellar
+We chose to build on Stellar because transaction speeds are super fast and network fees are extremely cheap, which is perfect for micro-payments:
+- **Dynamic Soroban Escrow (`likha-escrow`):** Instead of a single monolithic contract, we dynamically deploy a separate escrow contract instance on-chain for each project booking using its WASM ID. It manages locked funds, paid revision pricing, and milestones.
+- **On-chain Reputation Ledger (`likha-reputation`):** An immutable review and ranking registry where completed project counts, lifetime earnings, and star ratings/testimonials are kept secure and public on-chain to prove freelancer reliability.
+- **Blend Testnet Mock Oracle (Reflector Interface):** Used to convert USD listings to real-time XLM stroops during the funding step.
+- **Stellar Wallets Kit:** Connects Freighter wallet or other wallets for secure, password-free transaction signing.
+- **USDC & XLM Payments:** XLM is used for both project budgets and smart contract gas fees. Since platform fees are 0%, the only cost is the tiny Stellar gas fee.
 
-### Role of Firebase
-While LikhaSpace uses Stellar for payments and escrow, **Firebase Firestore** acts as the high-speed backend for off-chain platform data:
-- **Indexing Listings:** Stores the catalog of Freelancer services (Title, Description, Tags, Price) so the frontend can quickly filter and search.
-- **User Metadata:** Stores off-chain profile information, Star Ratings, and Testimonials.
-- **Messaging/Chat:** Stores the chat history and booking denial messages between Clients and Freelancers.
-- **State Management:** Tracks the "Occupied/Invisible" status of listings so they are hidden from the marketplace while a gig is active.
-
-### Role of the Smart Contracts
-- **`likha-escrow`:** The core Soroban Rust contract. Locks the funds, handles the automatic upfront splits, and executes final release or Mediator dispute resolutions.
-- **`reflector-mock` (Oracle):** Integrates with Reflector price feeds on the testnet. When a Client is ready to fund a $100 USD gig, the contract queries the Oracle to calculate the exact real-time equivalent in XLM to ensure accurate escrow lockups.
+## Track
+Track 2 Financial Inclusion & Everyday Payments
 
 ## Tech Stack
 - **Framework:** Next.js 16 (React 19, TypeScript)
-- **Stellar SDK:** `@stellar/stellar-sdk` v15.1.0, `@stellar/freighter-api` v6.0.1
-- **Network:** Stellar Testnet
-- **Database:** Firebase Firestore (v12.14.0)
-- **Styling:** Tailwind CSS v4 and Lucide React Icons
+- **Stellar Integration:** `@stellar/stellar-sdk` v15.1.0, `@stellar/freighter-api` v6.0.1, `@creit.tech/stellar-wallets-kit` v2.3.0
+- **Database & Storage:** Firebase Firestore (v12.14.0) & Firebase Storage
+- **Styling:** Tailwind CSS v4 & Lucide React Icons
 
 ## Setup & Run
-### Prerequisites
-- Node.js 20+ and npm
-- Freighter Browser Extension (Test Net)
-- Rust and Stellar CLI
+Here are the step-by-step instructions so you can easily run this project on your own machine.
 
-### Installation
-1. `git clone https://github.com/usep-f/LikhaSpace.git`
-2. `cd LikhaSpace/web && npm install`
-3. Set up `web/.env.local` (See repo for required variables)
-4. Deploy contracts: `.\scripts\deploy.ps1`
-5. Run frontend: `npm run dev`
+### 1. Clone the repository
+```bash
+git clone https://github.com/usep-f/LikhaSpace.git
+cd LikhaSpace
+```
+
+### 2. Install dependencies
+Go to the `web` folder and install:
+```bash
+cd web
+npm install
+```
+
+### 3. Setup your Environment Variables
+Create a file named `.env.local` inside the `web/` directory and configure the variables. Here is the template with the default values for our Testnet deploy:
+
+```env
+# Network
+NEXT_PUBLIC_STELLAR_NETWORK=testnet
+NEXT_PUBLIC_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
+NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+
+# Default Addresses
+NEXT_PUBLIC_MEDIATOR_ADDRESS=GDUUKJ4LZUPP3ZIREJX27FG2KQCSIHBB4QLVOCXSK632Q2Z2P2HNWRTQ
+NEXT_PUBLIC_ORACLE_ID=CAZOKR2Y5E2OSWSIBRVZMJ47RUTQPIGVWSAQ2UISGAVC46XKPGDG5PKI
+NEXT_PUBLIC_ESCROW_WASM_ID=f6290fa6fefa395fced97dada694eda742bb336038ea829273a1047479815eab
+NEXT_PUBLIC_REPUTATION_CONTRACT_ID=CCO3XB52IVULNJKT535HA6BPZDCVWDLRNH2FAY2YTNX4GGEIJKT3HSLO
+
+# Firebase Config (for off-chain listings, chat, and cache)
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=likhaspace-dfd01
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=1:your_firebase_messaging_sender_id:web:642b85a357eb8787b1a2bc
+
+# Firebase Admin SDK (Server-side)
+FIREBASE_ADMIN_PROJECT_ID=likhaspace-dfd01
+FIREBASE_ADMIN_CLIENT_EMAIL=your_firebase_admin_client_email
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+your_firebase_admin_private_key
+-----END PRIVATE KEY-----\n"
+
+# SEP-10 challenge signing key (server seed)
+SEP10_SERVER_SECRET=your_stellar_server_secret
+```
+
+### 4. How to Deploy the Soroban Contracts (Optional)
+If you want to compile and deploy your own contracts to the Stellar Testnet instead of using our pre-deployed ones:
+1. Make sure you have the [Stellar CLI](https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup#install-stellar-cli) and Rust installed.
+2. Run the deployment script from the project root:
+   ```powershell
+   # On Windows (PowerShell)
+   .\scripts\deploy_escrow.ps1
+   ```
+   This will build the contracts, install the escrow WASM, deploy & initialize the reputation contract, and automatically write the new IDs to `web/.env.local`.
+
+### 5. Run the web app locally
+In the `web/` directory, run the Next.js development server:
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser. Make sure your Freighter extension is set to **Test Net** and you have funded your test account using Friendbot!
+
+## Network Details
+- **Network:** Stellar Testnet
+- **RPC URL:** `https://soroban-testnet.stellar.org`
+- **Horizon URL:** `https://horizon-testnet.stellar.org`
+- **Passphrase:** `Test SDF Network ; September 2015`
+- **Pre-deployed Contract IDs:**
+  - **Reputation Contract:** `CCO3XB52IVULNJKT535HA6BPZDCVWDLRNH2FAY2YTNX4GGEIJKT3HSLO`
+  - **Escrow WASM ID:** `f6290fa6fefa395fced97dada694eda742bb336038ea829273a1047479815eab`
+  - **Mock Oracle ID:** `CAZOKR2Y5E2OSWSIBRVZMJ47RUTQPIGVWSAQ2UISGAVC46XKPGDG5PKI`
+
+## Team
+- Joseph Umali — @usep-f
 
 ## License
 MIT License

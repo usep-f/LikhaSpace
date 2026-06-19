@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
 import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, ShieldAlert } from 'lucide-react';
-import { Order, Gig } from '@/lib/types';
+import { Order, Gig, FreelancerProfile } from '@/lib/types';
 import { ChatModal } from '@/components/ChatModal';
 import { DeliverablesModal } from '@/components/DeliverablesModal';
 import { StatusModal } from '@/components/StatusModal';

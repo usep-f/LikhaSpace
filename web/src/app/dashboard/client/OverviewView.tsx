@@ -177,7 +177,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ profile }) => {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-white truncate">{proj.gigId || 'Custom Project'}</p>
-                        <p className="text-xs text-gray-400 truncate">Freelancer: {proj.freelancerName || 'Pending'}</p>
+                        <p className="text-xs text-gray-400 truncate">Freelancer: {proj.freelancerAddress ? `${proj.freelancerAddress.slice(0, 4)}...${proj.freelancerAddress.slice(-4)}` : 'Pending'}</p>
                       </div>
                     </div>
                     <div className="text-right">
