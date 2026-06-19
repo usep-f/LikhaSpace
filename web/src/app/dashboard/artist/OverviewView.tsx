@@ -1,8 +1,9 @@
 import React from 'react';
 import { FreelancerProfile, Order } from '@/lib/types';
 import { 
-  Mail, Phone, Briefcase, Star, Clock, CheckCircle2 
+  Mail, Phone, Briefcase, Star, Clock, CheckCircle2, Pencil
 } from 'lucide-react';
+import { ProfileSettingsModal } from './ProfileSettingsModal';
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -36,6 +37,7 @@ export interface OverviewViewProps {
 
 export const OverviewView: React.FC<OverviewViewProps> = ({ profile, totalEarned, completed }) => {
   const [orders, setOrders] = React.useState<Order[]>([]);
+  const [isEditProfileOpen, setIsEditProfileOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!profile?.address) return;
@@ -100,8 +102,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ profile, totalEarned
           <div className="absolute inset-0 bg-gradient-to-br from-hotpink/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           
           <div className="flex flex-col items-center text-center space-y-4 relative z-10">
-            <div className="w-24 h-24 rounded-full bg-zinc-800 border-2 border-hotpink flex items-center justify-center shadow-[0_0_15px_rgba(255,105,180,0.5)]">
-              <span className="text-3xl font-heading font-bold text-gray-400 tracking-widest">{initials}</span>
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full bg-zinc-800 border-2 border-hotpink flex items-center justify-center shadow-[0_0_15px_rgba(255,105,180,0.5)]">
+                <span className="text-3xl font-heading font-bold text-gray-400 tracking-widest">{initials}</span>
+              </div>
+              <button 
+                onClick={() => setIsEditProfileOpen(true)}
+                className="absolute bottom-0 right-0 p-2 bg-hotpink text-white rounded-full hover:bg-pink-600 transition-colors shadow-lg cursor-pointer"
+                title="Edit Profile"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
             </div>
             
             <div>
@@ -244,6 +255,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ profile, totalEarned
 
         </div>
       </div>
+
+      {isEditProfileOpen && (
+        <ProfileSettingsModal onClose={() => setIsEditProfileOpen(false)} />
+      )}
     </div>
   );
 };
