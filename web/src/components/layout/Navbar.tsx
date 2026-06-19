@@ -84,7 +84,9 @@ export const Navbar: React.FC = () => {
     ? '/dashboard/artist' 
     : role === 'client' 
       ? '/dashboard/client' 
-      : '#';
+      : role === 'mediator'
+        ? '/dashboard/mediator'
+        : '#';
 
   return (
     <nav className="sticky top-0 z-50 glass-card border-b border-white/5 w-full">
@@ -94,28 +96,28 @@ export const Navbar: React.FC = () => {
             <BrandLogo />
             <TestnetBadge />
             
-            {/* Primary Nav Links */}
-            <div className="hidden md:flex items-center space-x-4">
-              <Link href="/gigs" className="flex items-center space-x-1 text-xs text-gray-400 hover:text-white transition-colors duration-150">
-                <Globe className="w-3.5 h-3.5 text-neoncyan" />
-                <span>Marketplace</span>
-              </Link>
-              {isConnected && role && (
-                <Link href={dashboardUrl} className="flex items-center space-x-1 text-xs text-gray-400 hover:text-white transition-colors duration-150">
-                  <LayoutDashboard className="w-3.5 h-3.5 text-hotpink" />
-                  <span>Dashboard</span>
-                </Link>
-              )}
-            </div>
+
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Sandbox Quick Access Links */}
-            <div className="flex items-center space-x-2 border-r border-white/15 pr-4 mr-2 text-[10px] uppercase font-bold tracking-wider font-heading text-gray-400">
-              <span className="text-[9px] text-gray-500">Dev Sandbox:</span>
-              <Link href="/dashboard/client" className="hover:text-neoncyan transition-colors">Client</Link>
-              <span>•</span>
-              <Link href="/dashboard/artist" className="hover:text-hotpink transition-colors">Freelancer</Link>
+            {/* Navigation Links */}
+            <div className="flex items-center space-x-3 sm:space-x-4 border-r border-white/15 pr-4 mr-1">
+              <Link
+                href="/gigs"
+                className="flex items-center space-x-1 text-xs font-semibold text-gray-400 hover:text-white hover:text-glow-cyan transition-all duration-200 cursor-pointer"
+              >
+                <Globe className="w-3.5 h-3.5 text-neoncyan" />
+                <span className="hidden sm:inline">Marketplace</span>
+              </Link>
+              {isConnected && role && (
+                <Link
+                  href={dashboardUrl}
+                  className="flex items-center space-x-1 text-xs font-semibold text-gray-400 hover:text-white hover:text-glow-pink transition-all duration-200 cursor-pointer"
+                >
+                  <LayoutDashboard className="w-3.5 h-3.5 text-hotpink" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </Link>
+              )}
             </div>
 
             {isConnected && address ? (

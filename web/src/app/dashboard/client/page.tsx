@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWallet } from '@/context/WalletContext';
 import { Briefcase } from 'lucide-react';
 import { DashboardTabs } from './DashboardTabs';
@@ -9,8 +10,39 @@ import { ProfileSettingsView } from './ProfileSettingsView';
 import { HistoryView } from './HistoryView';
 
 export default function ClientDashboard() {
-  const { isConnected } = useWallet();
+  const { isConnected, address, isLoading, role, isRegistered } = useWallet();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('active_projects');
+
+  useEffect(() => {
+    if (isLoading) return;
+    
+    if (!isConnected || !address || !isRegistered) {
+      router.push('/');
+      return;
+    }
+
+    if (role !== 'client') {
+      if (role === 'artist') {
+        router.push('/dashboard/artist');
+      } else if (role === 'mediator') {
+        router.push('/dashboard/mediator');
+      } else {
+        router.push('/');
+      }
+    }
+  }, [isLoading, isConnected, address, role, isRegistered, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-obsidian text-white flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 border-4 border-neoncyan border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 font-heading text-sm">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-obsidian text-white py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -20,9 +52,7 @@ export default function ClientDashboard() {
           <span>Client Dashboard</span>
         </h1>
         <p className="text-xs text-gray-400 mt-1">
-          {isConnected
-            ? 'Track your active bookings, fund escrows, and communicate with freelancers.'
-            : 'Dev Sandbox: Showing mockup state. Connect wallet to sync.'}
+          Track your active bookings, fund escrows, and communicate with freelancers.
         </p>
       </div>
 
