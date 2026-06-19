@@ -1,6 +1,6 @@
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, arrayUnion } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, arrayUnion, orderBy, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
-import { Order, Gig } from './types'; // Reusing the interfaces from types
+import { Order, Gig, Notification } from './types'; // Reusing the interfaces from types
 
 /** GIGS */
 
@@ -100,12 +100,92 @@ export function subscribeToMediatorOrders(callback: (orders: Order[]) => void) {
 /** CHAT */
 
 export async function sendChatMessage(orderId: string, senderAddress: string, text: string) {
-  await updateDoc(doc(db, 'orders', orderId), {
-    chatMessages: arrayUnion({
-      id: crypto.randomUUID(),
-      senderAddress,
-      text,
-      timestamp: new Date().toISOString()
-    })
+  const orderRef = doc(db, 'orders', orderId);
+  const orderSnap = await getDoc(orderRef);
+  if (orderSnap.exists()) {
+    const order = orderSnap.data() as Order;
+    const recipientAddress = order.freelancerAddress === senderAddress ? order.clientAddress : order.freelancerAddress;
+    
+    await updateDoc(orderRef, {
+      chatMessages: arrayUnion({
+        id: crypto.randomUUID(),
+        senderAddress,
+        text,
+        timestamp: new Date().toISOString()
+      })
+    });
+
+    await createNotification({
+      recipientId: recipientAddress,
+      senderId: senderAddress,
+      senderName: 'New Message',
+      title: 'New Chat Message',
+      message: text.length > 50 ? `${text.slice(0, 50)}...` : text,
+      type: 'chat',
+      orderId: orderId,
+    });
+  }
+}
+
+/** NOTIFICATIONS */
+
+export async function createNotification(notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) {
+  const id = crypto.randomUUID();
+  const payload: Notification = {
+    ...notification,
+    id,
+    createdAt: new Date().toISOString(),
+    read: false,
+  };
+  await setDoc(doc(db, 'notifications', id), payload);
+}
+
+export function subscribeToNotifications(recipientId: string, callback: (notifications: Notification[]) => void) {
+  const q = query(
+    collection(db, 'notifications'),
+    where('recipientId', '==', recipientId),
+    orderBy('createdAt', 'desc')
+  );
+
+  return onSnapshot(q, async (snap) => {
+    const notifications = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Notification);
+    callback(notifications);
+
+    if (notifications.length > 21) {
+      const toDelete = notifications.slice(21);
+      const batch = writeBatch(db);
+      toDelete.forEach((n) => {
+        batch.delete(doc(db, 'notifications', n.id));
+      });
+      try {
+        await batch.commit();
+      } catch (err) {
+        console.error('Failed to auto-prune notifications:', err);
+      }
+    }
   });
+}
+
+export async function markNotificationAsRead(notificationId: string) {
+  await updateDoc(doc(db, 'notifications', notificationId), { read: true });
+}
+
+export async function markAllNotificationsAsRead(recipientId: string) {
+  const q = query(
+    collection(db, 'notifications'),
+    where('recipientId', '==', recipientId),
+    where('read', '==', false)
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => {
+      batch.update(d.ref, { read: true });
+    });
+    await batch.commit();
+  }
+}
+
+export async function deleteNotification(notificationId: string) {
+  await deleteDoc(doc(db, 'notifications', notificationId));
 }

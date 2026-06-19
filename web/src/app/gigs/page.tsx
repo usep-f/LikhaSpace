@@ -9,7 +9,7 @@ import { LoginModal } from '@/components/LoginModal';
 import { Gig, FreelancerProfile, Order } from '@/lib/types';
 import { useNotification } from '@/context/NotificationContext';
 import { useWallet } from '@/context/WalletContext';
-import { createOrder, getUserProfile } from '@/lib/db';
+import { createOrder, getUserProfile, createNotification } from '@/lib/db';
 
 function GigsContent() {
   const searchParams = useSearchParams();
@@ -82,6 +82,15 @@ function GigsContent() {
         milestones: gig.milestones || [],
       };
       await createOrder(order);
+      await createNotification({
+        recipientId: gig.freelancerAddress,
+        senderId: address,
+        senderName: userProfile?.name || 'Client',
+        title: 'New Booking Request',
+        message: `You have received a new booking request for "${gig.title}".`,
+        type: 'booking',
+        orderId: orderId,
+      });
       showToast(`Booking request sent for "${gig.title}". This will trigger the Escrow initialization upon Freelancer acceptance.`, 'success');
       setSelectedGigToBook(null);
     } catch (err: unknown) {

@@ -87,6 +87,19 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface Notification {
+  id: string;
+  recipientId: string;
+  senderId: string;
+  senderName: string;
+  title: string;
+  message: string;
+  type: 'booking' | 'escrow' | 'deliverable' | 'dispute' | 'chat';
+  orderId?: string;
+  createdAt: string;
+  read: boolean;
+}
+
 // Mock exports for testing/prototype fallback if needed:
 // export const mockProfiles: Record<string, FreelancerProfile> = {};
 // export const types: Gig[] = [];

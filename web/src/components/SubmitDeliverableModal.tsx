@@ -3,9 +3,10 @@ import { Order } from '@/lib/types';
 import { X, UploadCloud, Link as LinkIcon, FileText } from 'lucide-react';
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes } from 'firebase/storage';
-import { updateOrderStatus } from '@/lib/db';
+import { updateOrderStatus, createNotification } from '@/lib/db';
 import { submitDeliverable } from '@/lib/contract';
 import { useNotification } from '@/context/NotificationContext';
+import { useWallet } from '@/context/WalletContext';
 import { deliverableSchema, sanitizeInput } from '@/lib/validation';
 
 interface SubmitDeliverableModalProps {
@@ -16,6 +17,7 @@ interface SubmitDeliverableModalProps {
 
 export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ order, onClose, onSuccess }) => {
   const { showLoading, hideLoading } = useNotification();
+  const { userProfile } = useWallet();
   const [file, setFile] = useState<File | null>(null);
   const [link, setLink] = useState('');
   const [notes, setNotes] = useState('');
@@ -91,6 +93,16 @@ export const SubmitDeliverableModal: React.FC<SubmitDeliverableModalProps> = ({ 
         milestones: updatedMilestones,
         hasSubmittedOnce: true,
         changelogs: [...(order.changelogs || []), newChangelog]
+      });
+
+      await createNotification({
+        recipientId: order.clientAddress,
+        senderId: order.freelancerAddress,
+        senderName: userProfile?.name || 'Freelancer',
+        title: 'Deliverables Submitted',
+        message: `Freelancer submitted deliverables for milestone: "${milestone.title}". Please review.`,
+        type: 'deliverable',
+        orderId: order.id,
       });
 
       onSuccess();

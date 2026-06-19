@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
 import { Order } from '@/lib/types';
-import { subscribeToFreelancerOrders, updateOrderStatus } from '@/lib/db';
+import { subscribeToFreelancerOrders, updateOrderStatus, createNotification } from '@/lib/db';
 import { freelancerCancel, cancelUnfunded, requestMediation } from '@/lib/contract';
 import { denialMessageSchema, sanitizeInput } from '@/lib/validation';
 import { Pagination } from '@/components/Pagination';
@@ -17,7 +17,7 @@ import { DisputeModal } from '@/components/DisputeModal';
 import { OrderCard } from './OrderCard';
 
 export const OrdersView: React.FC = () => {
-  const { address } = useWallet();
+  const { address, userProfile } = useWallet();
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const { showToast, showConfirm, showLoading, hideLoading } = useNotification();
 
@@ -56,6 +56,15 @@ export const OrdersView: React.FC = () => {
         status: 'awaiting_funding',
         changelogs: [...(order?.changelogs || []), newChangelog]
       });
+      await createNotification({
+        recipientId: order!.clientAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Freelancer',
+        title: 'Booking Accepted',
+        message: `Your booking request has been accepted. Awaiting escrow funding.`,
+        type: 'escrow',
+        orderId: orderId,
+      });
       showToast('Booking accepted! Waiting for client to fund the escrow.', 'success');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -86,6 +95,15 @@ export const OrdersView: React.FC = () => {
         denialMessage: msg,
         changelogs: [...(order?.changelogs || []), newChangelog]
       });
+      await createNotification({
+        recipientId: order!.clientAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Freelancer',
+        title: 'Booking Declined',
+        message: `Your booking request was declined.`,
+        type: 'escrow',
+        orderId: orderId,
+      });
       setShowDenyInput(prev => ({ ...prev, [orderId]: false }));
       showToast('Booking request declined.', 'success');
     } catch (e: unknown) {
@@ -115,6 +133,15 @@ export const OrdersView: React.FC = () => {
           await updateOrderStatus(order.id, {
             status: 'denied',
             changelogs: [...(order.changelogs || []), newChangelog]
+          });
+          await createNotification({
+            recipientId: order.clientAddress,
+            senderId: address!,
+            senderName: userProfile?.name || 'Freelancer',
+            title: 'Booking Cancelled',
+            message: `The booking request was cancelled by the freelancer before funding.`,
+            type: 'escrow',
+            orderId: order.id,
           });
           showToast('Booking request cancelled successfully!', 'success');
         } catch (e: unknown) {
@@ -147,6 +174,15 @@ export const OrdersView: React.FC = () => {
             progressPercentage: 100,
             changelogs: [...(order.changelogs || []), newChangelog]
           });
+          await createNotification({
+            recipientId: order.clientAddress,
+            senderId: address!,
+            senderName: userProfile?.name || 'Freelancer',
+            title: 'Project Cancelled',
+            message: `The project was cancelled by the freelancer. Remaining locked funds refunded.`,
+            type: 'escrow',
+            orderId: order.id,
+          });
           showToast('Project cancelled and client refunded successfully!', 'success');
         } catch (e: unknown) {
           showToast(`Refund failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -172,6 +208,15 @@ export const OrdersView: React.FC = () => {
       await updateOrderStatus(order.id, {
         status: 'disputed',
         changelogs: [...(order.changelogs || []), newChangelog]
+      });
+      await createNotification({
+        recipientId: order.clientAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Freelancer',
+        title: 'Dispute Initiated',
+        message: `A dispute has been initiated for this project.`,
+        type: 'dispute',
+        orderId: order.id,
       });
       showToast('Dispute initiated successfully!', 'success');
     } catch (e: unknown) {
