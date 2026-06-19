@@ -15,7 +15,7 @@ import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
-import { subscribeToClientOrders, updateOrderStatus, getGig } from '@/lib/db';
+import { subscribeToClientOrders, updateOrderStatus, getGig, createNotification } from '@/lib/db';
 import { deployAndInitializeEscrow, fundEscrow, getRequiredXlmForGig, getOraclePrice, cancelUnfunded, clientCancelWithKillFee, requestMediation } from '@/lib/contract';
 import { getXlmBalance } from '@/lib/stellar';
 
@@ -58,7 +58,7 @@ async function checkEscrowBalance(address: string, priceUSD: number): Promise<bo
 }
 
 export const ActiveProjectsView: React.FC = () => {
-  const { address } = useWallet();
+  const { address, userProfile } = useWallet();
   const [clientOrders, setClientOrders] = useState<(Order & { gigInfo?: Gig })[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -137,6 +137,15 @@ export const ActiveProjectsView: React.FC = () => {
         progressPercentage: 0,
         changelogs: [...(order.changelogs || []), newChangelog]
       });
+      await createNotification({
+        recipientId: order.freelancerAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Client',
+        title: 'Escrow Funded',
+        message: `Escrow has been funded. You can now start working on the project!`,
+        type: 'escrow',
+        orderId: order.id,
+      });
       showToast('Escrow Successfully Funded!', 'success');
     } catch (e: unknown) {
       console.error(e);
@@ -163,6 +172,16 @@ export const ActiveProjectsView: React.FC = () => {
       await updateOrderStatus(order.id, {
         status: 'denied',
         changelogs: [...(order.changelogs || []), newChangelog]
+      });
+
+      await createNotification({
+        recipientId: order.freelancerAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Client',
+        title: 'Booking Cancelled',
+        message: `The booking was cancelled by the client before funding.`,
+        type: 'escrow',
+        orderId: order.id,
       });
 
       showToast('Booking cancelled successfully!', 'success');
@@ -192,6 +211,16 @@ export const ActiveProjectsView: React.FC = () => {
         changelogs: [...(order.changelogs || []), newChangelog]
       });
 
+      await createNotification({
+        recipientId: order.freelancerAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Client',
+        title: 'Project Cancelled',
+        message: `The project was cancelled by the client. Current milestone payout paid as kill fee, future milestones refunded.`,
+        type: 'escrow',
+        orderId: order.id,
+      });
+
       showToast('Project cancelled and refunded successfully!', 'success');
       setActiveCancelOrder(null);
     } catch (e: unknown) {
@@ -217,6 +246,16 @@ export const ActiveProjectsView: React.FC = () => {
       await updateOrderStatus(order.id, {
         status: 'disputed',
         changelogs: [...(order.changelogs || []), newChangelog]
+      });
+
+      await createNotification({
+        recipientId: order.freelancerAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Client',
+        title: 'Dispute Initiated',
+        message: `A dispute has been initiated for this project.`,
+        type: 'dispute',
+        orderId: order.id,
       });
 
       showToast('Dispute initiated successfully!', 'success');
@@ -269,6 +308,18 @@ export const ActiveProjectsView: React.FC = () => {
         changelogs: [...(order.changelogs || []), newChangelog]
       });
       
+      await createNotification({
+        recipientId: order.freelancerAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Client',
+        title: hasNext ? 'Milestone Approved' : 'Project Completed',
+        message: hasNext 
+          ? `Milestone "${order.milestones?.[order.currentMilestoneIdx || 0]?.title}" has been approved and funds released.`
+          : `Your final deliverables have been approved. Project is complete!`,
+        type: 'deliverable',
+        orderId: orderId,
+      });
+      
       showToast(hasNext ? 'Milestone approved. Funds released!' : 'Final deliverable approved. Project completed!', 'success');
       setActiveDeliverablesOrder(null);
       if (!hasNext) {
@@ -308,6 +359,15 @@ export const ActiveProjectsView: React.FC = () => {
         denialMessage: reason,
         milestones,
         changelogs: [...(order.changelogs || []), newChangelog]
+      });
+      await createNotification({
+        recipientId: order.freelancerAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Client',
+        title: 'Revision Requested',
+        message: `Client requested a revision: "${reason}"`,
+        type: 'deliverable',
+        orderId: orderId,
       });
       showToast('Deliverable denied.', 'info');
       setActiveDeliverablesOrder(null);
@@ -354,6 +414,15 @@ export const ActiveProjectsView: React.FC = () => {
         denialMessage: reason,
         milestones,
         changelogs: [...(order.changelogs || []), newChangelog]
+      });
+      await createNotification({
+        recipientId: order.freelancerAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Client',
+        title: 'Revision Requested',
+        message: `Client requested a revision: "${reason}"`,
+        type: 'deliverable',
+        orderId: orderId,
       });
       showToast('Revision purchased and deliverable denied successfully!', 'success');
       setActiveDeliverablesOrder(null);

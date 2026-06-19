@@ -4,6 +4,7 @@ import React from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { Wallet, LogOut, LayoutDashboard, Globe } from 'lucide-react';
 import Link from 'next/link';
+import { NotificationBell } from './NotificationBell';
 
 // Sub-component: Brand Logo
 const BrandLogo: React.FC = () => (
@@ -118,7 +119,10 @@ export const Navbar: React.FC = () => {
             </div>
 
             {isConnected && address ? (
-              <ProfileBox address={address} name={userProfile?.name} role={role} onDisconnect={disconnectWallet} />
+              <>
+                <NotificationBell />
+                <ProfileBox address={address} name={userProfile?.name} role={role} onDisconnect={disconnectWallet} />
+              </>
             ) : (
               <ConnectButtons onConnect={connectWallet} isLoading={isLoading} />
             )}
