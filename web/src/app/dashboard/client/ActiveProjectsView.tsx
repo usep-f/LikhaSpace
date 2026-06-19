@@ -15,7 +15,8 @@ import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
 import { DashboardSearch } from '@/components/DashboardSearch';
-import { subscribeToClientOrders, updateOrderStatus, getGig, createNotification } from '@/lib/db';
+import { ProfileModal } from '@/components/ProfileModal';
+import { subscribeToClientOrders, updateOrderStatus, getGig, createNotification, getUserProfile } from '@/lib/db';
 import { deployAndInitializeEscrow, fundEscrow, getRequiredXlmForGig, getOraclePrice, cancelUnfunded, clientCancelWithKillFee, requestMediation } from '@/lib/contract';
 import { getXlmBalance } from '@/lib/stellar';
 
@@ -71,8 +72,40 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeCancelOrder, setActiveCancelOrder] = useState<Order | null>(null);
   const [activeDisputeOrder, setActiveDisputeOrder] = useState<Order | null>(null);
   const [activeReviewOrder, setActiveReviewOrder] = useState<Order | null>(null);
+  const [activeFreelancerProfile, setActiveFreelancerProfile] = useState<FreelancerProfile | null>(null);
 
   const { showToast, showLoading, hideLoading } = useNotification();
+
+  const handleViewFreelancerProfile = async (freelancerAddress: string) => {
+    showLoading('Loading freelancer profile...');
+    try {
+      const p = await getUserProfile(freelancerAddress);
+      if (p) {
+        setActiveFreelancerProfile({
+          address: freelancerAddress,
+          name: p.name || 'Freelancer',
+          title: p.title || '',
+          bio: p.bio || '',
+          totalEarnedXLM: p.totalEarnedXLM || 0,
+          projectsCompleted: p.projectsCompleted || 0,
+          averageRating: p.averageRating || 5.0,
+          testimonials: p.testimonials || [],
+          role: 'freelancer',
+          github: p.github,
+          linkedin: p.linkedin,
+          twitter: p.twitter,
+          portfolio: p.portfolio,
+        });
+      } else {
+        showToast('Freelancer profile not found', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Error loading profile', 'error');
+    } finally {
+      hideLoading();
+    }
+  };
 
   React.useEffect(() => {
     if (!address) return;
@@ -488,11 +521,20 @@ export const ActiveProjectsView: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center gap-1 mb-1">
-                <UserWalletInfo
-                  address={order.freelancerAddress}
-                  role="freelancer"
-                  fallbackName={order.gigInfo?.freelancerName}
-                />
+                <div 
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleViewFreelancerProfile(order.freelancerAddress)}
+                  onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' ') handleViewFreelancerProfile(order.freelancerAddress) }}
+                  className="text-left hover:opacity-80 transition-opacity block cursor-pointer"
+                  title="View Freelancer Profile"
+                >
+                  <UserWalletInfo
+                    address={order.freelancerAddress}
+                    role="freelancer"
+                    fallbackName={order.gigInfo?.freelancerName}
+                  />
+                </div>
                 <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
               </div>
               <p className="text-xs text-gray-400 mt-1">{order.gigInfo?.title}</p>
@@ -661,6 +703,13 @@ export const ActiveProjectsView: React.FC = () => {
           order={activeReviewOrder}
           onClose={() => setActiveReviewOrder(null)}
           onReviewSubmitted={() => setActiveReviewOrder(null)}
+        />
+      )}
+
+      {activeFreelancerProfile && (
+        <ProfileModal
+          profile={activeFreelancerProfile}
+          onClose={() => setActiveFreelancerProfile(null)}
         />
       )}
     </div>

@@ -24,7 +24,7 @@ export const ProfileSettingsView: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     if (errors[e.target.name]) {
       setErrors({ ...errors, [e.target.name]: '' });
@@ -71,27 +71,57 @@ export const ProfileSettingsView: React.FC = () => {
   return (
     <div className="space-y-6 max-w-2xl">
       <h3 className="font-heading font-bold text-lg text-white">Profile Settings</h3>
-      <form onSubmit={handleSave} className="space-y-4 p-6 glass-card rounded-xl border border-white/5">
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
-          <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan" />
-          {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
+      <form onSubmit={handleSave} className="space-y-6 p-6 glass-card rounded-xl border border-white/5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
+            <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan transition-colors" />
+            {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+            <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan transition-colors" />
+            {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Phone</label>
+            <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan transition-colors" />
+            {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-slate-300 mb-1">Bio</label>
+            <textarea name="bio" value={formData.bio} onChange={handleChange} rows={3} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan transition-colors" placeholder="Tell us about your business or projects..." />
+            {errors.bio && <p className="text-red-400 text-xs mt-1">{errors.bio}</p>}
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-          <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan" />
-          {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
+
+        <div className="border-t border-white/5 pt-4 mt-2">
+          <h4 className="text-sm font-bold text-white mb-4">Social Links (Optional)</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">GitHub URL</label>
+              <input type="url" name="github" value={formData.github} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan transition-colors" placeholder="https://github.com/..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">LinkedIn URL</label>
+              <input type="url" name="linkedin" value={formData.linkedin} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan transition-colors" placeholder="https://linkedin.com/in/..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Twitter URL</label>
+              <input type="url" name="twitter" value={formData.twitter} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan transition-colors" placeholder="https://twitter.com/..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Portfolio URL</label>
+              <input type="url" name="portfolio" value={formData.portfolio} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan transition-colors" placeholder="https://yourwebsite.com" />
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1">Phone</label>
-          <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-neoncyan" />
-          {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
-        </div>
+
         <div className="flex justify-between pt-4 mt-4 border-t border-white/5">
-          <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-500/10 text-red-400 font-bold text-sm rounded hover:bg-red-500/20 transition-colors">
+          <button type="button" onClick={handleDelete} className="px-4 py-2 bg-red-500/10 text-red-400 font-bold text-sm rounded hover:bg-red-500/20 transition-colors cursor-pointer">
             Delete Account
           </button>
-          <button type="submit" className="px-6 py-2 bg-neoncyan text-obsidian font-bold text-sm rounded hover:shadow-[0_0_10px_rgba(0,255,255,0.4)] transition-all">
+          <button type="submit" className="px-6 py-2 bg-neoncyan text-obsidian font-bold text-sm rounded hover:shadow-[0_0_10px_rgba(0,255,255,0.4)] transition-all cursor-pointer">
             Save Changes
           </button>
         </div>
