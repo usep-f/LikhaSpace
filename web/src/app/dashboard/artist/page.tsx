@@ -7,17 +7,17 @@ import { Sparkles } from 'lucide-react';
 import { getUserProfile } from '@/lib/db';
 import { getFreelancerReputation, ReputationData } from '@/lib/contract';
 import { FreelancerProfile } from '@/lib/types';
-import { ReputationStatCard } from './ReputationStatCard';
 import { DashboardTabs } from './DashboardTabs';
 import { ListingsView } from './ListingsView';
 import { OrdersView } from './OrdersView';
 import { ProfileSettingsView } from './ProfileSettingsView';
 import { HistoryView } from './HistoryView';
+import { OverviewView } from './OverviewView';
 
 export default function ArtistDashboard() {
   const { isConnected, address, isLoading, role, isRegistered } = useWallet();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('listings');
+  const [activeTab, setActiveTab] = useState('overview');
   const [profile, setProfile] = useState<FreelancerProfile | null>(null);
   const [onChainReputation, setOnChainReputation] = useState<ReputationData | null>(null);
 
@@ -83,15 +83,7 @@ export default function ArtistDashboard() {
   const completed = onChainReputation ? onChainReputation.projectsCompleted : (profile?.projectsCompleted || 0);
   const totalEarned = onChainReputation ? Number(onChainReputation.totalEarnedStroops) / 10000000 : (profile?.totalEarnedXLM || 0);
 
-  // Check if there are any reviews in either database or on-chain
-  const hasOnChainReviews = onChainReputation && onChainReputation.ratingCount > 0;
-  const hasDbReviews = profile && profile.testimonials && profile.testimonials.length > 0;
-  
-  const ratingValue = hasOnChainReviews
-    ? onChainReputation.ratingSum / onChainReputation.ratingCount
-    : (hasDbReviews ? profile.averageRating : null);
 
-  const ratingText = ratingValue !== null ? `${ratingValue.toFixed(1)} Rating` : 'No Reviews';
 
   return (
     <div className="min-h-screen bg-obsidian text-white py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -105,15 +97,10 @@ export default function ArtistDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <ReputationStatCard label="Total XLM Earned" value={`${totalEarned.toLocaleString()} XLM`} colorClass="text-glow-green text-neongreen" />
-        <ReputationStatCard label="Gigs Completed" value={`${completed} Projects`} colorClass="text-glow-pink text-hotpink" />
-        <ReputationStatCard label="On-Chain Reputation" value={ratingText} colorClass="text-glow-cyan text-neoncyan" />
-      </div>
-
       <div className="mt-8">
         <DashboardTabs active={activeTab} onTabChange={setActiveTab} />
 
+        {activeTab === 'overview' && <OverviewView profile={profile} totalEarned={totalEarned} completed={completed} />}
         {activeTab === 'listings' && <ListingsView />}
         {activeTab === 'orders' && <OrdersView />}
         {activeTab === 'profile' && <ProfileSettingsView />}

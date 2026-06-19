@@ -3,16 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@/context/WalletContext';
+import { FreelancerProfile } from '@/lib/types';
 import { Briefcase } from 'lucide-react';
 import { DashboardTabs } from './DashboardTabs';
 import { ActiveProjectsView } from './ActiveProjectsView';
+import { OverviewView } from './OverviewView';
 import { ProfileSettingsView } from './ProfileSettingsView';
 import { HistoryView } from './HistoryView';
 
 export default function ClientDashboard() {
-  const { isConnected, address, isLoading, role, isRegistered } = useWallet();
+  const { isConnected, address, isLoading, role, isRegistered, userProfile } = useWallet();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('active_projects');
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     if (isLoading) return;
@@ -59,6 +61,7 @@ export default function ClientDashboard() {
       <div className="mt-8">
         <DashboardTabs active={activeTab} onTabChange={setActiveTab} />
 
+        {activeTab === 'overview' && <OverviewView profile={userProfile as FreelancerProfile | null} />}
         {activeTab === 'active_projects' && <ActiveProjectsView />}
         {activeTab === 'profile' && <ProfileSettingsView />}
         {activeTab === 'history' && <HistoryView />}
