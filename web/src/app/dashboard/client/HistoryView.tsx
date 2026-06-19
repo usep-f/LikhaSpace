@@ -2,15 +2,50 @@
 
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
+import { useNotification } from '@/context/NotificationContext';
 import { ShieldCheck } from 'lucide-react';
-import { Order, Gig } from '@/lib/types';
-import { getClientOrders, getGig } from '@/lib/db';
+import { Order, Gig, FreelancerProfile } from '@/lib/types';
+import { getClientOrders, getGig, getUserProfile } from '@/lib/db';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
+import { ProfileModal } from '@/components/ProfileModal';
 
 export const HistoryView: React.FC = () => {
   const { address } = useWallet();
+  const { showToast, showLoading, hideLoading } = useNotification();
   const [completedOrders, setCompletedOrders] = useState<(Order & { gigInfo?: Gig })[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeFreelancerProfile, setActiveFreelancerProfile] = useState<FreelancerProfile | null>(null);
+
+  const handleViewFreelancerProfile = async (freelancerAddress: string) => {
+    showLoading('Loading freelancer profile...');
+    try {
+      const p = await getUserProfile(freelancerAddress);
+      if (p) {
+        setActiveFreelancerProfile({
+          address: freelancerAddress,
+          name: p.name || 'Freelancer',
+          title: p.title || '',
+          bio: p.bio || '',
+          totalEarnedXLM: p.totalEarnedXLM || 0,
+          projectsCompleted: p.projectsCompleted || 0,
+          averageRating: p.averageRating || 5.0,
+          testimonials: p.testimonials || [],
+          role: 'freelancer',
+          github: p.github,
+          linkedin: p.linkedin,
+          twitter: p.twitter,
+          portfolio: p.portfolio,
+        });
+      } else {
+        showToast('Freelancer profile not found', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Error loading profile', 'error');
+    } finally {
+      hideLoading();
+    }
+  };
 
   React.useEffect(() => {
     if (!address) return;
@@ -57,11 +92,20 @@ export const HistoryView: React.FC = () => {
                         order.status === 'settled_dispute' ? 'Settled Dispute' : 'Cancelled Order'}
                      </p>
                     <div className="flex items-center gap-1 mb-1">
-                      <UserWalletInfo
-                        address={order.freelancerAddress}
-                        role="freelancer"
-                        fallbackName={order.gigInfo?.freelancerName}
-                      />
+                      <div 
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleViewFreelancerProfile(order.freelancerAddress)}
+                        onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' ') handleViewFreelancerProfile(order.freelancerAddress) }}
+                        className="text-left hover:opacity-80 transition-opacity block cursor-pointer"
+                        title="View Freelancer Profile"
+                      >
+                        <UserWalletInfo
+                          address={order.freelancerAddress}
+                          role="freelancer"
+                          fallbackName={order.gigInfo?.freelancerName}
+                        />
+                      </div>
                       <ShieldCheck className="w-3.5 h-3.5 text-neongreen" />
                     </div>
                     <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
@@ -80,6 +124,13 @@ export const HistoryView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {activeFreelancerProfile && (
+        <ProfileModal
+          profile={activeFreelancerProfile}
+          onClose={() => setActiveFreelancerProfile(null)}
+        />
+      )}
     </div>
   );
 };

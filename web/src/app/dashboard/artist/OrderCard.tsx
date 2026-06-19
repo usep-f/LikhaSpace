@@ -22,6 +22,7 @@ export interface OrderCardProps {
   onDisputePanel: (order: Order) => void;
   onMessage: (order: Order) => void;
   onViewStatus: (order: Order) => void;
+  onViewClientProfile: (clientAddress: string) => void;
   showToast: (msg: string, type: 'success' | 'error') => void;
 }
 
@@ -60,6 +61,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   onDisputePanel,
   onMessage,
   onViewStatus,
+  onViewClientProfile,
   showToast,
 }) => {
   const badge = getStatusBadge(order);
@@ -78,12 +80,20 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             {order.status === 'pending_acceptance' ? 'New Request' : 'Active Order'}
           </p>
         </div>
-        <UserWalletInfo
-          address={order.clientAddress}
-          role="client"
-          fallbackName={order.clientName}
-          className="mb-1"
-        />
+        <div 
+          role="button"
+          tabIndex={0}
+          onClick={() => onViewClientProfile(order.clientAddress)}
+          onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' ') onViewClientProfile(order.clientAddress) }}
+          className="text-left hover:opacity-80 transition-opacity mb-1 block cursor-pointer"
+          title="View Client Profile"
+        >
+          <UserWalletInfo
+            address={order.clientAddress}
+            role="client"
+            fallbackName={order.clientName}
+          />
+        </div>
         <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>
       </div>
 

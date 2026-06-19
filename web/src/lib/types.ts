@@ -14,6 +14,11 @@ export interface FreelancerProfile {
   projectsCompleted: number;
   averageRating: number;
   testimonials: Testimonial[];
+  github?: string;
+  linkedin?: string;
+  twitter?: string;
+  portfolio?: string;
+  role?: string;
 }
 export interface MilestoneConfig {
   title: string;
