@@ -39,7 +39,7 @@ export const SaaSFaqAccordion: React.FC<SaaSFaqAccordionProps> = () => {
   };
 
   return (
-    <section className="py-16 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-white/5">
+    <section id="faq" className="py-16 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-white/5">
       <div className="text-center mb-10">
         <h2 className="font-heading text-3xl font-bold text-white tracking-tight">
           Frequently Asked <span className="text-hotpink text-glow-pink">Questions</span>
