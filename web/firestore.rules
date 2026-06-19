@@ -25,9 +25,16 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.freelancerAddress == request.auth.uid;
 
-      // Only the gig owner (freelancer) can update or delete their own gig
-      allow update, delete: if request.auth != null
+      // Only the gig owner (freelancer) can delete their own gig
+      allow delete: if request.auth != null
         && resource.data.freelancerAddress == request.auth.uid;
+
+      // Only the gig owner can update any field, or any authenticated user can update only rating and reviewsCount
+      allow update: if request.auth != null
+        && (
+          resource.data.freelancerAddress == request.auth.uid
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'reviewsCount'])
+        );
     }
 
     // ───────────────────────────────────────────────
@@ -62,6 +69,17 @@ service cloud.firestore {
 
       // Deletion not permitted — orders are permanent audit records
       allow delete: if false;
+    }
+    // ───────────────────────────────────────────────
+    // NOTIFICATIONS
+    // ───────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read, delete: if request.auth != null && resource.data.recipientId == request.auth.uid;
+      allow update: if request.auth != null && resource.data.recipientId == request.auth.uid 
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create: if request.auth != null 
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.read == false;
     }
   }
 }

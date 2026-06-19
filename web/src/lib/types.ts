@@ -14,6 +14,13 @@ export interface FreelancerProfile {
   projectsCompleted: number;
   averageRating: number;
   testimonials: Testimonial[];
+  github?: string;
+  linkedin?: string;
+  twitter?: string;
+  portfolio?: string;
+  role?: string;
+  email?: string;
+  phone?: string;
 }
 export interface MilestoneConfig {
   title: string;
@@ -85,6 +92,19 @@ export interface ChatMessage {
   senderAddress: string;
   text: string;
   timestamp: string;
+}
+
+export interface Notification {
+  id: string;
+  recipientId: string;
+  senderId: string;
+  senderName: string;
+  title: string;
+  message: string;
+  type: 'booking' | 'escrow' | 'deliverable' | 'dispute' | 'chat';
+  orderId?: string;
+  createdAt: string;
+  read: boolean;
 }
 
 // Mock exports for testing/prototype fallback if needed:

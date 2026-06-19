@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShieldAlert, Coins } from 'lucide-react';
 import { Order } from '@/lib/types';
 import { useNotification } from '@/context/NotificationContext';
-import { updateOrderStatus } from '@/lib/db';
+import { updateOrderStatus, createNotification } from '@/lib/db';
 import { getLockedBalance, resolveDispute } from '@/lib/contract';
 
 export interface ResolveDisputeModalProps {
@@ -73,6 +73,28 @@ export const ResolveDisputeModal: React.FC<ResolveDisputeModalProps> = ({
         status: 'settled_dispute',
         progressPercentage: 100,
         changelogs: [...(order.changelogs || []), newChangelog],
+      });
+
+      // Notify Freelancer
+      await createNotification({
+        recipientId: order.freelancerAddress,
+        senderId: currentAddress,
+        senderName: 'Mediator',
+        title: 'Dispute Resolved',
+        message: `The mediator has resolved the dispute. You received ${split}% of the locked funds.`,
+        type: 'dispute',
+        orderId: order.id,
+      });
+
+      // Notify Client
+      await createNotification({
+        recipientId: order.clientAddress,
+        senderId: currentAddress,
+        senderName: 'Mediator',
+        title: 'Dispute Resolved',
+        message: `The mediator has resolved the dispute. You received ${100 - split}% of the locked funds.`,
+        type: 'dispute',
+        orderId: order.id,
       });
 
       showToast('Dispute successfully resolved!', 'success');

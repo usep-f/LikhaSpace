@@ -8,7 +8,7 @@ import {
 } from '@stellar/stellar-sdk';
 import { server, NETWORK_PASSPHRASE } from './stellar';
 
-export const REPUTATION_CONTRACT_ID = process.env.NEXT_PUBLIC_REPUTATION_CONTRACT_ID!;
+import { REPUTATION_CONTRACT_ID } from './contractConstants';
 
 export interface ReputationData {
   projectsCompleted: number;
@@ -60,7 +60,7 @@ export async function getFreelancerReputation(freelancerAddress: string): Promis
         const nativeObj = native as Record<string, unknown>;
         const reviewsList = nativeObj.reviews;
         const reviews = Array.isArray(reviewsList) ? (reviewsList as Array<Record<string, unknown>>).map((r) => ({
-          client: typeof r.client === 'object' && r.client ? r.client.toString() : '',
+          client: typeof r.client === 'string' ? r.client : (typeof r.client === 'object' && r.client ? r.client.toString() : ''),
           rating: Number(r.rating || 0),
           text: typeof r.text === 'string' ? r.text : '',
           timestamp: Number(r.timestamp || 0)

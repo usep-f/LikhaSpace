@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWallet } from '@/context/WalletContext';
 import { ShieldAlert } from 'lucide-react';
 import { DashboardTabs } from './DashboardTabs';
@@ -8,16 +9,29 @@ import { ActiveDisputesView } from './ActiveDisputesView';
 import { HistoryView } from './HistoryView';
 
 export default function MediatorDashboard() {
-  const { isConnected, address } = useWallet();
+  const { isConnected, address, isLoading } = useWallet();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('active_disputes');
 
   // Basic access control
   useEffect(() => {
+    if (isLoading) return;
     const mediatorAddress = process.env.NEXT_PUBLIC_MEDIATOR_ADDRESS;
-    if (isConnected && address !== mediatorAddress) {
-      window.location.href = '/';
+    if (!isConnected || address !== mediatorAddress) {
+      router.push('/');
     }
-  }, [isConnected, address]);
+  }, [isLoading, isConnected, address, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-obsidian text-white flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 border-4 border-neoncyan border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 font-heading text-sm">Verifying mediator access...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (address !== process.env.NEXT_PUBLIC_MEDIATOR_ADDRESS) {
     return (
@@ -35,9 +49,7 @@ export default function MediatorDashboard() {
           <span>Mediator Dashboard</span>
         </h1>
         <p className="text-xs text-gray-400 mt-1">
-          {isConnected
-            ? 'Review and resolve active disputes across the platform.'
-            : 'Connect your wallet to manage disputes.'}
+          Review and resolve active disputes across the platform.
         </p>
       </div>
 

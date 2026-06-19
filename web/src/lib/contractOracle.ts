@@ -8,8 +8,7 @@ import {
 } from '@stellar/stellar-sdk';
 import { server, NETWORK_PASSPHRASE } from './stellar';
 
-export const ORACLE_ID = process.env.NEXT_PUBLIC_ORACLE_ID!;
-export const TESTNET_XLM = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
+import { ORACLE_ID, TESTNET_XLM } from './contractConstants';
 
 export async function getOraclePrice(): Promise<number> {
   try {

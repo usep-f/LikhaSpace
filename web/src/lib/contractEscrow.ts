@@ -15,13 +15,14 @@ import {
   getContractIdFromTxResult,
 } from './stellarUtils';
 
-export const ESCROW_WASM_ID = process.env.NEXT_PUBLIC_ESCROW_WASM_ID!;
-export const ORACLE_ID = process.env.NEXT_PUBLIC_ORACLE_ID!;
-export const REPUTATION_CONTRACT_ID = process.env.NEXT_PUBLIC_REPUTATION_CONTRACT_ID!;
-export const TESTNET_XLM = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
-
-export const DEFAULT_MEDIATOR = process.env.NEXT_PUBLIC_MEDIATOR_ADDRESS || 'GAFBCLO24QMPVXFZJHVLRG6CKAGBJEMCW57UG45SS7PQ2LGMZTGY7DGX';
-export const PLATFORM_TREASURY = 'GC6QMW4WWFBXWZWLBIZ33PYWVXQGQYN3L7MBJ5BZTGT7UWJ5CHBSL3FU';
+import {
+  ESCROW_WASM_ID,
+  ORACLE_ID,
+  REPUTATION_CONTRACT_ID,
+  TESTNET_XLM,
+  DEFAULT_MEDIATOR,
+  PLATFORM_TREASURY,
+} from './contractConstants';
 
 function buildMilestonesScVal(
   milestones: { payout_amount_usd: number; max_revisions: number }[]

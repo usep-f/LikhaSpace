@@ -2,18 +2,53 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/context/WalletContext';
+import { useNotification } from '@/context/NotificationContext';
 import { Sparkles, ShieldCheck } from 'lucide-react';
-import { Order } from '@/lib/types';
-import { getFreelancerOrders } from '@/lib/db';
+import { Order, FreelancerProfile } from '@/lib/types';
+import { getFreelancerOrders, getUserProfile } from '@/lib/db';
 import { getFreelancerReputation } from '@/lib/contract';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
+import { ProfileModal } from '@/components/ProfileModal';
 
 type HistoryItem = Order & { isRestored?: boolean; restoredDate?: Date };
 
 export const HistoryView: React.FC = () => {
   const { address } = useWallet();
+  const { showToast, showLoading, hideLoading } = useNotification();
   const [completedOrders, setCompletedOrders] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(!!address);
+  const [activeClientProfile, setActiveClientProfile] = useState<FreelancerProfile | null>(null);
+
+  const handleViewClientProfile = async (clientAddress: string) => {
+    showLoading('Loading client profile...');
+    try {
+      const p = await getUserProfile(clientAddress);
+      if (p) {
+        setActiveClientProfile({
+          address: clientAddress,
+          name: p.name || 'Client',
+          title: p.title || '',
+          bio: p.bio || '',
+          totalEarnedXLM: 0,
+          projectsCompleted: 0,
+          averageRating: 5.0,
+          testimonials: [],
+          role: 'client',
+          github: p.github,
+          linkedin: p.linkedin,
+          twitter: p.twitter,
+          portfolio: p.portfolio,
+        });
+      } else {
+        showToast('Client profile not found', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Error loading profile', 'error');
+    } finally {
+      hideLoading();
+    }
+  };
 
   useEffect(() => {
     if (!address) return;
@@ -102,12 +137,20 @@ export const HistoryView: React.FC = () => {
                      </p>
                      {order.isRestored && <ShieldCheck className="w-3.5 h-3.5 text-green-400" />}
                    </div>
-                   <UserWalletInfo
-                     address={order.clientAddress}
-                     role="client"
-                     fallbackName={order.clientName}
-                     className="mb-1"
-                   />
+                   <div 
+                     role="button"
+                     tabIndex={0}
+                     onClick={() => handleViewClientProfile(order.clientAddress)}
+                     onKeyDown={(e) => { if(e.key === 'Enter' || e.key === ' ') handleViewClientProfile(order.clientAddress) }}
+                     className="text-left hover:opacity-80 transition-opacity mb-1 block cursor-pointer"
+                     title="View Client Profile"
+                   >
+                     <UserWalletInfo
+                       address={order.clientAddress}
+                       role="client"
+                       fallbackName={order.clientName}
+                     />
+                   </div>
                    {!order.isRestored && <p className="text-xs text-gray-400 mt-1">Total: ${order.priceUSD} USD</p>}
                    {order.isRestored && order.restoredDate && (
                      <p className="text-xs text-green-500/70 mt-1">Restored from Ledger • {order.restoredDate.toLocaleDateString()}</p>
@@ -138,6 +181,13 @@ export const HistoryView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {activeClientProfile && (
+        <ProfileModal
+          profile={activeClientProfile}
+          onClose={() => setActiveClientProfile(null)}
+        />
+      )}
     </div>
   );
 };

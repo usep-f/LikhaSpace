@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
-import { Order } from '@/lib/types';
-import { subscribeToFreelancerOrders, updateOrderStatus } from '@/lib/db';
+import { Order, FreelancerProfile } from '@/lib/types';
+import { subscribeToFreelancerOrders, updateOrderStatus, createNotification, getUserProfile } from '@/lib/db';
 import { freelancerCancel, cancelUnfunded, requestMediation } from '@/lib/contract';
 import { denialMessageSchema, sanitizeInput } from '@/lib/validation';
 import { Pagination } from '@/components/Pagination';
@@ -14,10 +14,11 @@ import { ChatModal } from '@/components/ChatModal';
 import { StatusModal } from '@/components/StatusModal';
 import { SubmitDeliverableModal } from '@/components/SubmitDeliverableModal';
 import { DisputeModal } from '@/components/DisputeModal';
+import { ProfileModal } from '@/components/ProfileModal';
 import { OrderCard } from './OrderCard';
 
 export const OrdersView: React.FC = () => {
-  const { address } = useWallet();
+  const { address, userProfile } = useWallet();
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const { showToast, showConfirm, showLoading, hideLoading } = useNotification();
 
@@ -34,6 +35,7 @@ export const OrdersView: React.FC = () => {
   const [activeStatusOrder, setActiveStatusOrder] = useState<Order | null>(null);
   const [activeSubmitOrder, setActiveSubmitOrder] = useState<Order | null>(null);
   const [activeDisputeOrder, setActiveDisputeOrder] = useState<Order | null>(null);
+  const [activeClientProfile, setActiveClientProfile] = useState<FreelancerProfile | null>(null);
 
   useEffect(() => {
     if (!address) return;
@@ -42,6 +44,37 @@ export const OrdersView: React.FC = () => {
     });
     return () => unsubscribe();
   }, [address]);
+
+  const handleViewClientProfile = async (clientAddress: string) => {
+    showLoading('Loading client profile...');
+    try {
+      const p = await getUserProfile(clientAddress);
+      if (p) {
+        setActiveClientProfile({
+          address: clientAddress,
+          name: p.name || 'Client',
+          title: p.title || '',
+          bio: p.bio || '',
+          totalEarnedXLM: 0,
+          projectsCompleted: 0,
+          averageRating: 5.0,
+          testimonials: [],
+          role: 'client',
+          github: p.github,
+          linkedin: p.linkedin,
+          twitter: p.twitter,
+          portfolio: p.portfolio,
+        });
+      } else {
+        showToast('Client profile not found', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Error loading profile', 'error');
+    } finally {
+      hideLoading();
+    }
+  };
 
   const handleAcceptBooking = async (orderId: string) => {
     const order = myOrders.find(o => o.id === orderId);
@@ -55,6 +88,15 @@ export const OrdersView: React.FC = () => {
       await updateOrderStatus(orderId, { 
         status: 'awaiting_funding',
         changelogs: [...(order?.changelogs || []), newChangelog]
+      });
+      await createNotification({
+        recipientId: order!.clientAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Freelancer',
+        title: 'Booking Accepted',
+        message: `Your booking request has been accepted. Awaiting escrow funding.`,
+        type: 'escrow',
+        orderId: orderId,
       });
       showToast('Booking accepted! Waiting for client to fund the escrow.', 'success');
     } catch (e: unknown) {
@@ -86,6 +128,15 @@ export const OrdersView: React.FC = () => {
         denialMessage: msg,
         changelogs: [...(order?.changelogs || []), newChangelog]
       });
+      await createNotification({
+        recipientId: order!.clientAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Freelancer',
+        title: 'Booking Declined',
+        message: `Your booking request was declined.`,
+        type: 'escrow',
+        orderId: orderId,
+      });
       setShowDenyInput(prev => ({ ...prev, [orderId]: false }));
       showToast('Booking request declined.', 'success');
     } catch (e: unknown) {
@@ -115,6 +166,15 @@ export const OrdersView: React.FC = () => {
           await updateOrderStatus(order.id, {
             status: 'denied',
             changelogs: [...(order.changelogs || []), newChangelog]
+          });
+          await createNotification({
+            recipientId: order.clientAddress,
+            senderId: address!,
+            senderName: userProfile?.name || 'Freelancer',
+            title: 'Booking Cancelled',
+            message: `The booking request was cancelled by the freelancer before funding.`,
+            type: 'escrow',
+            orderId: order.id,
           });
           showToast('Booking request cancelled successfully!', 'success');
         } catch (e: unknown) {
@@ -147,6 +207,15 @@ export const OrdersView: React.FC = () => {
             progressPercentage: 100,
             changelogs: [...(order.changelogs || []), newChangelog]
           });
+          await createNotification({
+            recipientId: order.clientAddress,
+            senderId: address!,
+            senderName: userProfile?.name || 'Freelancer',
+            title: 'Project Cancelled',
+            message: `The project was cancelled by the freelancer. Remaining locked funds refunded.`,
+            type: 'escrow',
+            orderId: order.id,
+          });
           showToast('Project cancelled and client refunded successfully!', 'success');
         } catch (e: unknown) {
           showToast(`Refund failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -172,6 +241,15 @@ export const OrdersView: React.FC = () => {
       await updateOrderStatus(order.id, {
         status: 'disputed',
         changelogs: [...(order.changelogs || []), newChangelog]
+      });
+      await createNotification({
+        recipientId: order.clientAddress,
+        senderId: address!,
+        senderName: userProfile?.name || 'Freelancer',
+        title: 'Dispute Initiated',
+        message: `A dispute has been initiated for this project.`,
+        type: 'dispute',
+        orderId: order.id,
       });
       showToast('Dispute initiated successfully!', 'success');
     } catch (e: unknown) {
@@ -234,6 +312,7 @@ export const OrdersView: React.FC = () => {
               onDisputePanel={setActiveDisputeOrder}
               onMessage={setActiveChatOrder}
               onViewStatus={setActiveStatusOrder}
+              onViewClientProfile={handleViewClientProfile}
               showToast={showToast}
             />
           ))
@@ -291,6 +370,13 @@ export const OrdersView: React.FC = () => {
           onSuccess={() => {
             setActiveDisputeOrder(null);
           }}
+        />
+      )}
+
+      {activeClientProfile && (
+        <ProfileModal
+          profile={activeClientProfile}
+          onClose={() => setActiveClientProfile(null)}
         />
       )}
     </div>

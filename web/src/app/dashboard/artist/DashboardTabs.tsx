@@ -6,7 +6,7 @@ export interface DashboardTabsProps {
 }
 
 export const DashboardTabs: React.FC<DashboardTabsProps> = ({ active, onTabChange }) => {
-  const tabs = ['Listings', 'Orders', 'Profile', 'History'];
+  const tabs = ['Overview', 'Listings', 'Orders', 'History'];
   return (
     <div className="flex space-x-6 border-b border-white/5 mb-8">
       {tabs.map((t) => (

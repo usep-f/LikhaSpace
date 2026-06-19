@@ -68,7 +68,7 @@ export const UserWalletInfo: React.FC<UserWalletInfoProps> = ({
   if (!displayName && fallbackName) {
     const cleanFallback = fallbackName.trim();
     // Avoid using fallback strings that contain the wallet address pattern
-    const isAddressPattern = cleanFallback.includes('(') || cleanFallback.includes('...') || cleanFallback.includes(address.slice(0, 4));
+    const isAddressPattern = cleanFallback.includes('(') || cleanFallback.includes('...') || (address && cleanFallback.includes(address.slice(0, 4)));
     if (!isAddressPattern) {
       displayName = cleanFallback;
     }
