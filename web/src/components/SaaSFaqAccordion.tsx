@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { AnimatedSection, AnimatedItem } from '@/components/ui/AnimatedSection';
 
 export interface SaaSFaqAccordionProps {
   className?: string;
@@ -40,51 +42,59 @@ export const SaaSFaqAccordion: React.FC<SaaSFaqAccordionProps> = () => {
 
   return (
     <section id="faq" className="py-16 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-white/5">
-      <div className="text-center mb-10">
+      <AnimatedSection className="text-center mb-10">
         <h2 className="font-heading text-3xl font-bold text-white tracking-tight">
-          Frequently Asked <span className="text-hotpink text-glow-pink">Questions</span>
+          Frequently Asked <span className="text-transparent bg-clip-text bg-gradient-to-r from-hotpink to-neoncyan text-glow-pink text-shimmer-gradient">Questions</span>
         </h2>
         <p className="text-sm text-gray-400 mt-2">
           Learn how trustless freelance agreements work under the hood.
         </p>
-      </div>
+      </AnimatedSection>
 
-      <div className="space-y-4">
+      <AnimatedSection stagger className="space-y-4">
         {FAQS.map((faq, idx) => {
           const isOpen = openIdx === idx;
           return (
-            <div
-              key={idx}
-              onClick={() => toggleFaq(idx)}
-              className="p-5 rounded-xl glass-card border border-white/5 hover:border-white/10 cursor-pointer transition-all duration-200"
-            >
-              <button
-                type="button"
-                className="w-full flex items-center justify-between text-left focus:outline-none cursor-pointer"
-              >
-                <span className="font-heading font-semibold text-sm text-white select-none">
-                  {faq.question}
-                </span>
-                {isOpen ? (
-                  <ChevronUp className="w-4 h-4 text-hotpink" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                )}
-              </button>
-              
+            <AnimatedItem key={idx}>
               <div
-                className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                  isOpen ? 'max-h-40 mt-3 opacity-100' : 'max-h-0 opacity-0'
-                }`}
+                onClick={() => toggleFaq(idx)}
+                className="p-5 rounded-xl glass-card border border-white/5 hover:border-white/10 cursor-pointer transition-all duration-200"
               >
-                <p className="text-xs text-gray-400 leading-relaxed select-none">
-                  {faq.answer}
-                </p>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between text-left focus:outline-none cursor-pointer"
+                >
+                  <span className="font-heading font-semibold text-sm text-white select-none">
+                    {faq.question}
+                  </span>
+                  {isOpen ? (
+                    <ChevronUp className="w-4 h-4 text-hotpink" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  )}
+                </button>
+                
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      key={`faq-answer-${idx}`}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                      className="overflow-hidden"
+                    >
+                      <p className="text-xs text-gray-400 leading-relaxed select-none mt-3">
+                        {faq.answer}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-            </div>
+            </AnimatedItem>
           );
         })}
-      </div>
+      </AnimatedSection>
     </section>
   );
 };
