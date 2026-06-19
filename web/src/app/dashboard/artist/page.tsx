@@ -10,7 +10,6 @@ import { FreelancerProfile } from '@/lib/types';
 import { DashboardTabs } from './DashboardTabs';
 import { ListingsView } from './ListingsView';
 import { OrdersView } from './OrdersView';
-import { ProfileSettingsView } from './ProfileSettingsView';
 import { HistoryView } from './HistoryView';
 import { OverviewView } from './OverviewView';
 
@@ -103,7 +102,6 @@ export default function ArtistDashboard() {
         {activeTab === 'overview' && <OverviewView profile={profile} totalEarned={totalEarned} completed={completed} />}
         {activeTab === 'listings' && <ListingsView />}
         {activeTab === 'orders' && <OrdersView />}
-        {activeTab === 'profile' && <ProfileSettingsView />}
         {activeTab === 'history' && <HistoryView />}
       </div>
     </div>
