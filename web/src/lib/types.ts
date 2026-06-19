@@ -19,6 +19,8 @@ export interface FreelancerProfile {
   twitter?: string;
   portfolio?: string;
   role?: string;
+  email?: string;
+  phone?: string;
 }
 export interface MilestoneConfig {
   title: string;
