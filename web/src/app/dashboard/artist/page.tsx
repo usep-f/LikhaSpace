@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWallet } from '@/context/WalletContext';
 import { Sparkles } from 'lucide-react';
 import { getUserProfile } from '@/lib/db';
@@ -14,7 +15,8 @@ import { ProfileSettingsView } from './ProfileSettingsView';
 import { HistoryView } from './HistoryView';
 
 export default function ArtistDashboard() {
-  const { isConnected, address } = useWallet();
+  const { isConnected, address, isLoading, role, isRegistered } = useWallet();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('listings');
   const [profile, setProfile] = useState<FreelancerProfile | null>(null);
   const [onChainReputation, setOnChainReputation] = useState<ReputationData | null>(null);
@@ -47,6 +49,36 @@ export default function ArtistDashboard() {
       .catch(console.error);
   }, [address]);
 
+  useEffect(() => {
+    if (isLoading) return;
+    
+    if (!isConnected || !address || !isRegistered) {
+      router.push('/');
+      return;
+    }
+
+    if (role !== 'artist') {
+      if (role === 'client') {
+        router.push('/dashboard/client');
+      } else if (role === 'mediator') {
+        router.push('/dashboard/mediator');
+      } else {
+        router.push('/');
+      }
+    }
+  }, [isLoading, isConnected, address, role, isRegistered, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-obsidian text-white flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 border-4 border-hotpink border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 font-heading text-sm">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Calculate dynamic stats
   const completed = onChainReputation ? onChainReputation.projectsCompleted : (profile?.projectsCompleted || 0);
   const totalEarned = onChainReputation ? Number(onChainReputation.totalEarnedStroops) / 10000000 : (profile?.totalEarnedXLM || 0);
@@ -69,9 +101,7 @@ export default function ArtistDashboard() {
           <span>Freelancer Dashboard</span>
         </h1>
         <p className="text-xs text-gray-400 mt-1">
-          {isConnected 
-            ? 'Manage your services, accept requests, and track active escrow contracts.'
-            : 'Dev Sandbox: Showing mockup state. Connect wallet to sync.'}
+          Manage your services, accept requests, and track active escrow contracts.
         </p>
       </div>
 
