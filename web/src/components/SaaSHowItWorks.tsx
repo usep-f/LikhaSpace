@@ -34,7 +34,7 @@ const StepCard: React.FC<StepCardProps> = ({ step, title, description, icon, bor
 
 export const SaaSHowItWorks: React.FC<SaaSHowItWorksProps> = () => {
   return (
-    <section className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-white/5">
+    <section id="how-it-works" className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-white/5">
       <div className="text-center mb-12">
         <h2 className="font-heading text-3xl font-bold text-white tracking-tight">
           How <span className="text-transparent bg-clip-text bg-gradient-to-r from-hotpink to-neoncyan text-glow-pink">LikhaSpace</span> Works
