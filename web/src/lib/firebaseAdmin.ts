@@ -9,24 +9,24 @@ function getAdminApp(): App {
     return getApps()[0];
   }
 
-  if (process.env.NODE_ENV === 'production') {
-    return initializeApp();
-  }
-
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      'Missing Firebase Admin credentials. Set FIREBASE_ADMIN_PROJECT_ID, ' +
-      'FIREBASE_ADMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY in your .env.local file.'
-    );
+  if (projectId && clientEmail && privateKey) {
+    return initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey }),
+    });
   }
 
-  return initializeApp({
-    credential: cert({ projectId, clientEmail, privateKey }),
-  });
+  if (process.env.NODE_ENV === 'production') {
+    return initializeApp();
+  }
+
+  throw new Error(
+    'Missing Firebase Admin credentials. Set FIREBASE_ADMIN_PROJECT_ID, ' +
+    'FIREBASE_ADMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY in your .env.local file.'
+  );
 }
 
 export function getAdminAuth() {

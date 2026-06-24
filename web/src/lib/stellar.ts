@@ -1,5 +1,4 @@
 import { rpc, Networks, Horizon } from '@stellar/stellar-sdk';
-import * as Freighter from '@stellar/freighter-api';
 
 export const STELLAR_NETWORK = process.env.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet';
 export const RPC_URL = process.env.NEXT_PUBLIC_STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
@@ -40,6 +39,7 @@ export async function fundWithFriendbot(address: string): Promise<boolean> {
  * Helper to get the current connected wallet address via Freighter.
  */
 export async function getConnectedAddress(): Promise<string | null> {
+  const Freighter = await import('@stellar/freighter-api');
   if (await Freighter.isConnected()) {
     const pubKey = await Freighter.getAddress();
     if (pubKey.address) {
