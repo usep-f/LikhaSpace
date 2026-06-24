@@ -66,23 +66,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ profile, totalEarned
 
 
 
-  // Derive rating metric data (mocking the last 5 projects if no real data)
+  // Derive rating metric data
   const completedOrdersWithReviews = orders
     .filter(o => o.status === 'completed' && o.review)
     .slice(-5);
   
-  const ratingData = completedOrdersWithReviews.length > 0 
-    ? completedOrdersWithReviews.map((o, i) => ({
-        name: `Proj ${i + 1}`,
-        rating: o.review?.rating || 0
-      }))
-    : [
-        { name: 'Proj 1', rating: 5 },
-        { name: 'Proj 2', rating: 4 },
-        { name: 'Proj 3', rating: 5 },
-        { name: 'Proj 4', rating: 4.5 },
-        { name: 'Proj 5', rating: 5 },
-      ];
+  const ratingData = completedOrdersWithReviews.map((o, i) => ({
+    name: `Proj ${i + 1}`,
+    rating: o.review?.rating || 0
+  }));
 
   const initials = displayProfile.name
     .split(' ')
@@ -217,39 +209,46 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ profile, totalEarned
             </div>
             
             <div className="flex-1 min-h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={ratingData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
-                    stroke="#ffffff40" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    stroke="#ffffff40" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false}
-                    domain={[0, 5]}
-                    ticks={[0, 1, 2, 3, 4, 5]}
-                  />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0F172A', borderColor: '#ffffff20', borderRadius: '8px' }}
-                    itemStyle={{ color: '#00F0FF' }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="rating" 
-                    stroke="#00F0FF" 
-                    strokeWidth={3}
-                    dot={{ fill: '#0F172A', stroke: '#00F0FF', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, fill: '#00F0FF' }}
-                    animationDuration={1500}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {completedOrdersWithReviews.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={ratingData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#ffffff40" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      stroke="#ffffff40" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false}
+                      domain={[0, 5]}
+                      ticks={[0, 1, 2, 3, 4, 5]}
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0F172A', borderColor: '#ffffff20', borderRadius: '8px' }}
+                      itemStyle={{ color: '#00F0FF' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="rating" 
+                      stroke="#00F0FF" 
+                      strokeWidth={3}
+                      dot={{ fill: '#0F172A', stroke: '#00F0FF', strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6, fill: '#00F0FF' }}
+                      animationDuration={1500}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500 py-8">
+                  <Star className="w-8 h-8 mb-2 opacity-20 text-neoncyan" />
+                  <p className="text-sm">No ratings yet</p>
+                </div>
+              )}
             </div>
           </div>
 
