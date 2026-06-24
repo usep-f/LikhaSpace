@@ -74,7 +74,6 @@ function getAdminApp(): App {
       console.log('[firebaseAdmin] crypto.createPrivateKey SUCCESS:', {
         type: keyObj.type,
         asymmetricKeyType: keyObj.asymmetricKeyType,
-        asymmetricKeySize: keyObj.asymmetricKeySize,
       });
     } catch (cryptoErr) {
       console.error('[firebaseAdmin] crypto.createPrivateKey FAILED:', cryptoErr);
