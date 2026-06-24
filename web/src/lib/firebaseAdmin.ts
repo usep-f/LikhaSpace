@@ -12,8 +12,23 @@ function parsePrivateKey(key?: string): string | undefined {
   } else if (parsed.startsWith("'") && parsed.endsWith("'")) {
     parsed = parsed.slice(1, -1);
   }
-  parsed = parsed.replace(/\\n/g, '\n').trim();
-  return parsed;
+  
+  // Handle literal escaped newlines or real newlines
+  parsed = parsed.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+
+  // If Vercel stripped newlines or replaced them with spaces, reconstruct the PEM format
+  if (!parsed.includes('\n') && parsed.includes('-----BEGIN PRIVATE KEY-----') && parsed.includes('-----END PRIVATE KEY-----')) {
+    const content = parsed
+      .replace('-----BEGIN PRIVATE KEY-----', '')
+      .replace('-----END PRIVATE KEY-----', '')
+      .replace(/\s+/g, ''); // Remove any spaces that might have replaced newlines
+    
+    // Split the base64 content into chunks of 64 characters (standard PEM wrapping)
+    const chunks = content.match(/.{1,64}/g) || [];
+    parsed = ['-----BEGIN PRIVATE KEY-----', ...chunks, '-----END PRIVATE KEY-----'].join('\n');
+  }
+
+  return parsed.trim();
 }
 
 function getAdminApp(): App {
