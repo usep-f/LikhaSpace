@@ -64,21 +64,35 @@ NEXT_PUBLIC_REPUTATION_CONTRACT_ID=CCO3XB52IVULNJKT535HA6BPZDCVWDLRNH2FAY2YTNX4G
 # Firebase Config (for off-chain listings, chat, and cache)
 NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=likhaspace-dfd01
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_firebase_project_id
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=1:your_firebase_messaging_sender_id:web:642b85a357eb8787b1a2bc
+NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
 
 # Firebase Admin SDK (Server-side)
-FIREBASE_ADMIN_PROJECT_ID=likhaspace-dfd01
+FIREBASE_ADMIN_PROJECT_ID=your_firebase_admin_project_id
 FIREBASE_ADMIN_CLIENT_EMAIL=your_firebase_admin_client_email
 FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
 your_firebase_admin_private_key
 -----END PRIVATE KEY-----\n"
 
 # SEP-10 challenge signing key (server seed)
+# Replace with a generated Stellar private key (starts with 'S')
 SEP10_SERVER_SECRET=your_stellar_server_secret
 ```
+
+#### How to get these credentials for localhost:
+* **Stellar SEP-10 & Mediator Address**:
+  1. Go to the [Stellar Laboratory Account Creator](https://laboratory.stellar.org/#account-creator?network=testnet).
+  2. Click **Generate Keypair**.
+  3. Set `SEP10_SERVER_SECRET` to the generated **Secret Key** (starts with `S`).
+  4. Set `NEXT_PUBLIC_MEDIATOR_ADDRESS` to the generated **Public Key** (starts with `G`).
+* **Firebase Config & Admin SDK**:
+  1. Create a free project in the [Firebase Console](https://console.firebase.google.com/).
+  2. Register a new **Web App** in the project settings. Copy the web config fields and paste them under the `# Firebase Config` section.
+  3. Go to **Project Settings** > **Service Accounts**, select **Node.js**, and click **Generate new private key**.
+  4. Open the downloaded JSON file and populate `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, and `FIREBASE_ADMIN_PRIVATE_KEY` with the corresponding values from the JSON.
+
 
 ### 4. How to Deploy the Soroban Contracts (Optional)
 If you want to compile and deploy your own contracts to the Stellar Testnet instead of using our pre-deployed ones:
