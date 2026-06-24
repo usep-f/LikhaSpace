@@ -94,8 +94,8 @@ export const ListingsView: React.FC = () => {
     tags: updatedGig.tags || [],
     status: updatedGig.status || 'active',
     milestones: updatedGig.milestones || [],
-    rating: editingGig?.rating,
-    reviewsCount: editingGig?.reviewsCount,
+    rating: editingGig?.rating ?? 0,
+    reviewsCount: editingGig?.reviewsCount ?? 0,
   });
 
   const handleSaveListing = async (updatedGig: Partial<Gig>) => {
