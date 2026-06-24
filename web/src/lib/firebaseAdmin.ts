@@ -1,61 +1,88 @@
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { initializeApp, getApps, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import crypto from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 // Server-side only — never import this in client components.
 // Uses FIREBASE_ADMIN_* env vars which are NOT prefixed with NEXT_PUBLIC_.
 
-function parsePrivateKey(key?: string): string | undefined {
-  if (!key) {
-    console.error('[firebaseAdmin] FIREBASE_ADMIN_PRIVATE_KEY is empty/undefined');
-    return undefined;
-  }
-
-  // Diagnostic: log raw key metadata (NEVER the key itself)
-  console.log('[firebaseAdmin] Raw key diagnostics:', {
-    rawLength: key.length,
-    startsWithQuote: key[0] === '"' || key[0] === "'",
-    endsWithQuote: key[key.length - 1] === '"' || key[key.length - 1] === "'",
-    hasLiteralBackslashN: key.includes('\\n'),
-    hasRealNewline: key.includes('\n'),
-    hasCarriageReturn: key.includes('\r'),
-    first40: key.substring(0, 40),
-    last40: key.substring(key.length - 40),
-  });
-
+/**
+ * Parse the PEM private key from the environment variable.
+ * Handles Vercel's escaping (literal `\n` strings) and
+ * quote-wrapping variations.
+ */
+function parsePrivateKey(key: string): string {
   let parsed = key.trim();
+
+  // Strip outer quotes if present
   if (parsed.startsWith('"') && parsed.endsWith('"')) {
     parsed = parsed.slice(1, -1);
   } else if (parsed.startsWith("'") && parsed.endsWith("'")) {
     parsed = parsed.slice(1, -1);
   }
-  
-  // Handle literal escaped newlines or real newlines
+
+  // Convert literal escaped newlines to real newlines
   parsed = parsed.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
 
-  // If Vercel stripped newlines or replaced them with spaces, reconstruct the PEM format
-  if (!parsed.includes('\n') && parsed.includes('-----BEGIN PRIVATE KEY-----') && parsed.includes('-----END PRIVATE KEY-----')) {
-    console.log('[firebaseAdmin] PEM had no newlines — reconstructing...');
+  // Reconstruct PEM if newlines were completely stripped
+  if (
+    !parsed.includes('\n') &&
+    parsed.includes('-----BEGIN PRIVATE KEY-----') &&
+    parsed.includes('-----END PRIVATE KEY-----')
+  ) {
     const content = parsed
       .replace('-----BEGIN PRIVATE KEY-----', '')
       .replace('-----END PRIVATE KEY-----', '')
       .replace(/\s+/g, '');
-    
+
     const chunks = content.match(/.{1,64}/g) || [];
-    parsed = ['-----BEGIN PRIVATE KEY-----', ...chunks, '-----END PRIVATE KEY-----'].join('\n');
+    parsed = [
+      '-----BEGIN PRIVATE KEY-----',
+      ...chunks,
+      '-----END PRIVATE KEY-----',
+    ].join('\n');
   }
 
-  // Diagnostic: log parsed key metadata
-  const lines = parsed.split('\n');
-  console.log('[firebaseAdmin] Parsed key diagnostics:', {
-    parsedLength: parsed.length,
-    lineCount: lines.length,
-    firstLine: lines[0],
-    lastLine: lines[lines.length - 1],
-    secondLineLen: lines[1]?.length,
+  return parsed.trim();
+}
+
+/**
+ * Write a temporary service-account JSON file and set
+ * GOOGLE_APPLICATION_CREDENTIALS so that firebase-admin
+ * uses `ApplicationDefaultCredential` instead of
+ * `ServiceAccountCredential`.
+ *
+ * This bypasses the `crypto.createPrivateKey()` validation
+ * that fails on Vercel due to the bundler polyfilling
+ * `node:crypto`.
+ */
+function ensureCredentialFile(
+  projectId: string,
+  clientEmail: string,
+  privateKey: string,
+): void {
+  // Skip if already set and the file exists
+  const existing = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (existing && fs.existsSync(existing)) {
+    return;
+  }
+
+  const serviceAccount = {
+    type: 'service_account',
+    project_id: projectId,
+    private_key: privateKey,
+    client_email: clientEmail,
+    token_uri: 'https://oauth2.googleapis.com/token',
+  };
+
+  const tmpDir = os.tmpdir();
+  const filePath = path.join(tmpDir, 'firebase-sa.json');
+  fs.writeFileSync(filePath, JSON.stringify(serviceAccount), {
+    mode: 0o600,
   });
 
-  return parsed.trim();
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = filePath;
 }
 
 function getAdminApp(): App {
@@ -63,46 +90,29 @@ function getAdminApp(): App {
     return getApps()[0];
   }
 
-  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const projectId =
+    process.env.FIREBASE_ADMIN_PROJECT_ID ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  const privateKey = parsePrivateKey(process.env.FIREBASE_ADMIN_PRIVATE_KEY);
+  const rawKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
 
-  if (projectId && clientEmail && privateKey) {
-    // Diagnostic: test if Node.js crypto can parse the key directly
-    try {
-      const keyObj = crypto.createPrivateKey(privateKey);
-      console.log('[firebaseAdmin] crypto.createPrivateKey SUCCESS:', {
-        type: keyObj.type,
-        asymmetricKeyType: keyObj.asymmetricKeyType,
-      });
-    } catch (cryptoErr) {
-      console.error('[firebaseAdmin] crypto.createPrivateKey FAILED:', cryptoErr);
-      // Try with explicit options
-      try {
-        const keyObj = crypto.createPrivateKey({
-          key: privateKey,
-          format: 'pem',
-          type: 'pkcs8',
-        });
-        console.log('[firebaseAdmin] crypto.createPrivateKey with options SUCCESS:', {
-          type: keyObj.type,
-          asymmetricKeyType: keyObj.asymmetricKeyType,
-        });
-      } catch (cryptoErr2) {
-        console.error('[firebaseAdmin] crypto.createPrivateKey with options also FAILED:', cryptoErr2);
-      }
-    }
-
-    return initializeApp({
-      credential: cert({ projectId, clientEmail, privateKey }),
-    });
+  if (!projectId || !clientEmail || !rawKey) {
+    throw new Error(
+      `Missing Firebase Admin credentials. ` +
+        `projectId: ${!!projectId}, clientEmail: ${!!clientEmail}, ` +
+        `privateKey: ${!!rawKey}. ` +
+        `Set FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, ` +
+        `and FIREBASE_ADMIN_PRIVATE_KEY in your environment.`
+    );
   }
 
-  throw new Error(
-    `Missing Firebase Admin credentials in environment. ` +
-    `projectId configured: ${!!projectId}, clientEmail configured: ${!!clientEmail}, privateKey configured: ${!!privateKey}. ` +
-    `Please ensure FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY are set correctly in Vercel.`
-  );
+  const privateKey = parsePrivateKey(rawKey);
+  ensureCredentialFile(projectId, clientEmail, privateKey);
+
+  // initializeApp() with no arguments uses
+  // GOOGLE_APPLICATION_CREDENTIALS → ApplicationDefaultCredential,
+  // which does NOT call crypto.createPrivateKey().
+  return initializeApp({ projectId });
 }
 
 export function getAdminAuth() {
