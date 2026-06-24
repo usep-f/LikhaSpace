@@ -4,18 +4,23 @@ import { getAuth } from 'firebase-admin/auth';
 // Server-side only — never import this in client components.
 // Uses FIREBASE_ADMIN_* env vars which are NOT prefixed with NEXT_PUBLIC_.
 
+function parsePrivateKey(key?: string): string | undefined {
+  if (!key) return undefined;
+  let parsed = key.replace(/\\n/g, '\n');
+  if (parsed.startsWith('"') && parsed.endsWith('"')) {
+    parsed = parsed.slice(1, -1);
+  }
+  return parsed;
+}
+
 function getAdminApp(): App {
   if (getApps().length > 0) {
     return getApps()[0];
   }
 
-  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  let privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-  if (privateKey?.startsWith('"') && privateKey?.endsWith('"')) {
-    privateKey = privateKey.slice(1, -1);
-  }
+  const privateKey = parsePrivateKey(process.env.FIREBASE_ADMIN_PRIVATE_KEY);
 
   if (projectId && clientEmail && privateKey) {
     return initializeApp({
@@ -23,13 +28,10 @@ function getAdminApp(): App {
     });
   }
 
-  if (process.env.NODE_ENV === 'production') {
-    return initializeApp();
-  }
-
   throw new Error(
-    'Missing Firebase Admin credentials. Set FIREBASE_ADMIN_PROJECT_ID, ' +
-    'FIREBASE_ADMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY in your .env.local file.'
+    `Missing Firebase Admin credentials in environment. ` +
+    `projectId configured: ${!!projectId}, clientEmail configured: ${!!clientEmail}, privateKey configured: ${!!privateKey}. ` +
+    `Please ensure FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY are set correctly in Vercel.`
   );
 }
 

@@ -11,6 +11,68 @@ function getServerKeypair(): Keypair {
   return Keypair.fromSecret(secret);
 }
 
+function getHomeDomain(req: NextRequest): string {
+  let domain = process.env.SEP10_HOME_DOMAIN || req.headers.get('x-forwarded-host') || req.headers.get('host') || new URL(req.url).host;
+  if (domain.startsWith('http://') || domain.startsWith('https://')) {
+    try {
+      domain = new URL(domain).host;
+    } catch {
+      domain = domain.replace(/^https?:\/\//, '').split('/')[0];
+    }
+  } else {
+    domain = domain.split('/')[0];
+  }
+  return domain;
+}
+
+async function fetchClientSigners(clientAccountID: string): Promise<string[]> {
+  let signers = [clientAccountID];
+  try {
+    const horizon = new Horizon.Server(HORIZON_URL);
+    const accountInfo = await horizon.loadAccount(clientAccountID);
+    signers = accountInfo.signers.map((s) => s.key);
+  } catch {
+    // Ignore errors (e.g. account unfunded) and proceed with default signer
+  }
+  return signers;
+}
+
+async function verifyChallengeAndGetToken(challengeTx: string, homeDomain: string) {
+  const serverKP = getServerKeypair();
+  const serverAccountId = serverKP.publicKey();
+  const networkPassphrase = STELLAR_NETWORK === 'public' ? Networks.PUBLIC : Networks.TESTNET;
+
+  const { clientAccountID } = WebAuth.readChallengeTx(
+    challengeTx,
+    serverAccountId,
+    networkPassphrase,
+    homeDomain,
+    homeDomain
+  );
+
+  const signers = await fetchClientSigners(clientAccountID);
+
+  const signersFound = WebAuth.verifyChallengeTxSigners(
+    challengeTx,
+    serverAccountId,
+    networkPassphrase,
+    signers,
+    homeDomain,
+    homeDomain
+  );
+
+  if (!signersFound || signersFound.length === 0) {
+    throw new Error('Signatures do not match client account');
+  }
+
+  const adminAuth = getAdminAuth();
+  const customToken = await adminAuth.createCustomToken(clientAccountID, {
+    stellarAddress: clientAccountID,
+  });
+
+  return { token: customToken, address: clientAccountID };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { challengeTx } = await req.json() as { challengeTx?: string };
@@ -19,56 +81,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing challengeTx transaction envelope XDR' }, { status: 400 });
     }
 
-    const serverKP = getServerKeypair();
-    const serverAccountId = serverKP.publicKey();
-    const networkPassphrase = STELLAR_NETWORK === 'public' ? Networks.PUBLIC : Networks.TESTNET;
-    
-    // homeDomain must match whatever was used to generate the challenge
-    const url = new URL(req.url);
-    const homeDomain = process.env.SEP10_HOME_DOMAIN || url.host;
+    const homeDomain = getHomeDomain(req);
+    const result = await verifyChallengeAndGetToken(challengeTx, homeDomain);
 
-    // 1. Read challenge & verify server signature, timebounds, and home domain
-    const { clientAccountID } = WebAuth.readChallengeTx(
-      challengeTx,
-      serverAccountId,
-      networkPassphrase,
-      homeDomain,
-      homeDomain // webAuthDomain
-    );
-
-    // 2. Fetch the client's signers from the network to support multisig accounts.
-    // If the account is unfunded or the fetch fails, fallback to the account ID itself.
-    let signers = [clientAccountID];
-    try {
-      const horizon = new Horizon.Server(HORIZON_URL);
-      const accountInfo = await horizon.loadAccount(clientAccountID);
-      signers = accountInfo.signers.map((s) => s.key);
-    } catch {
-      // Ignore errors (e.g. account unfunded) and proceed with default signer
-    }
-
-    // 3. Verify that the client signatures meet the threshold (or are valid signers)
-    // verifyChallengeTxSigners returns the matching signers found on the transaction
-    const signersFound = WebAuth.verifyChallengeTxSigners(
-      challengeTx,
-      serverAccountId,
-      networkPassphrase,
-      signers,
-      homeDomain,
-      homeDomain // webAuthDomain
-    );
-
-    if (!signersFound || signersFound.length === 0) {
-      return NextResponse.json({ error: 'Signatures do not match client account' }, { status: 401 });
-    }
-
-    // 4. Issue Firebase Custom Token with uid = Stellar address
-    const adminAuth = getAdminAuth();
-    const customToken = await adminAuth.createCustomToken(clientAccountID, {
-      stellarAddress: clientAccountID,
-    });
-
-    return NextResponse.json({ token: customToken, address: clientAccountID });
+    return NextResponse.json(result);
   } catch (error: unknown) {
     console.error('[/api/auth/sep10/verify] Error:', error);
     const msg = error instanceof Error ? error.message : 'Internal server error';
