@@ -25,6 +25,9 @@ function parsePrivateKey(key: string): string {
   // Convert literal escaped newlines to real newlines
   parsed = parsed.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
 
+  // Defensive: Fix a copy-paste typo where '\nvdEg' became '\vdEg' or a vertical tab (\x0b)
+  parsed = parsed.replace(/\\vdEg/g, '\nvdEg').replace(/\x0bdEg/g, '\nvdEg');
+
   // Reconstruct PEM if newlines were completely stripped
   if (
     !parsed.includes('\n') &&
