@@ -6,10 +6,13 @@ import { getAuth } from 'firebase-admin/auth';
 
 function parsePrivateKey(key?: string): string | undefined {
   if (!key) return undefined;
-  let parsed = key.replace(/\\n/g, '\n');
+  let parsed = key.trim();
   if (parsed.startsWith('"') && parsed.endsWith('"')) {
     parsed = parsed.slice(1, -1);
+  } else if (parsed.startsWith("'") && parsed.endsWith("'")) {
+    parsed = parsed.slice(1, -1);
   }
+  parsed = parsed.replace(/\\n/g, '\n').trim();
   return parsed;
 }
 
