@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import crypto from 'crypto';
 
 // Server-side only — never import this in client components.
 // Uses FIREBASE_ADMIN_* env vars which are NOT prefixed with NEXT_PUBLIC_.
@@ -67,6 +68,32 @@ function getAdminApp(): App {
   const privateKey = parsePrivateKey(process.env.FIREBASE_ADMIN_PRIVATE_KEY);
 
   if (projectId && clientEmail && privateKey) {
+    // Diagnostic: test if Node.js crypto can parse the key directly
+    try {
+      const keyObj = crypto.createPrivateKey(privateKey);
+      console.log('[firebaseAdmin] crypto.createPrivateKey SUCCESS:', {
+        type: keyObj.type,
+        asymmetricKeyType: keyObj.asymmetricKeyType,
+        asymmetricKeySize: keyObj.asymmetricKeySize,
+      });
+    } catch (cryptoErr) {
+      console.error('[firebaseAdmin] crypto.createPrivateKey FAILED:', cryptoErr);
+      // Try with explicit options
+      try {
+        const keyObj = crypto.createPrivateKey({
+          key: privateKey,
+          format: 'pem',
+          type: 'pkcs8',
+        });
+        console.log('[firebaseAdmin] crypto.createPrivateKey with options SUCCESS:', {
+          type: keyObj.type,
+          asymmetricKeyType: keyObj.asymmetricKeyType,
+        });
+      } catch (cryptoErr2) {
+        console.error('[firebaseAdmin] crypto.createPrivateKey with options also FAILED:', cryptoErr2);
+      }
+    }
+
     return initializeApp({
       credential: cert({ projectId, clientEmail, privateKey }),
     });
