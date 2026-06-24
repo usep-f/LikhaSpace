@@ -9,32 +9,54 @@ import { StellarWalletsKit } from './walletKit';
  * 3. Send signed transaction to server to verify and obtain custom Firebase token
  * 4. Authenticate with Firebase
  */
-export async function loginWithStellar(stellarAddress: string): Promise<string> {
-  const challengeRes = await fetch(`/api/auth/sep10/challenge?address=${encodeURIComponent(stellarAddress)}`);
-  if (!challengeRes.ok) {
-    const errBody = await challengeRes.json() as { error?: string };
-    throw new Error(errBody.error || 'Failed to fetch SEP-10 challenge from server.');
+async function handleResponseError(res: Response, defaultMsg: string): Promise<never> {
+  let errMsg = defaultMsg;
+  try {
+    const errBody = await res.json() as { error?: string };
+    if (errBody.error) errMsg = errBody.error;
+  } catch {
+    try {
+      const text = await res.text();
+      errMsg = `Server error (${res.status}): ${text.slice(0, 200)}`;
+    } catch {
+      errMsg = `Server returned status code ${res.status}`;
+    }
   }
+  throw new Error(errMsg);
+}
 
+async function fetchChallenge(stellarAddress: string): Promise<string> {
+  const url = `/api/auth/sep10/challenge?address=${encodeURIComponent(stellarAddress)}`;
+  const challengeRes = await fetch(url);
+  if (!challengeRes.ok) {
+    await handleResponseError(challengeRes, 'Failed to fetch SEP-10 challenge from server.');
+  }
   const { challenge } = await challengeRes.json() as { challenge: string };
+  return challenge;
+}
+
+async function verifyChallenge(signedTxXdr: string): Promise<string> {
+  const verifyRes = await fetch('/api/auth/sep10/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeTx: signedTxXdr }),
+  });
+  if (!verifyRes.ok) {
+    await handleResponseError(verifyRes, 'Server verification of SEP-10 signature failed.');
+  }
+  const { token } = await verifyRes.json() as { token: string };
+  return token;
+}
+
+export async function loginWithStellar(stellarAddress: string): Promise<string> {
+  const challenge = await fetchChallenge(stellarAddress);
   const { signedTxXdr } = await StellarWalletsKit.signTransaction(challenge);
   
   if (!signedTxXdr) {
     throw new Error('No signed transaction returned from wallet.');
   }
 
-  const verifyRes = await fetch('/api/auth/sep10/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ challengeTx: signedTxXdr }),
-  });
-
-  if (!verifyRes.ok) {
-    const errBody = await verifyRes.json() as { error?: string };
-    throw new Error(errBody.error || 'Server verification of SEP-10 signature failed.');
-  }
-
-  const { token } = await verifyRes.json() as { token: string };
+  const token = await verifyChallenge(signedTxXdr);
   await signInWithCustomToken(auth, token);
   
   return stellarAddress;
