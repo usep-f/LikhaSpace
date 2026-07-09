@@ -5,25 +5,31 @@
       "source": "stellar/stellar-dev-skill",
       "sourceType": "github",
       "skillPath": "skills/agentic-payments/SKILL.md",
-      "computedHash": "0a2495bd73f67bc9dfb704d108af52a2449710fa9ace68b5fd1326ab09a4ef8b"
+      "computedHash": "502afd7615a6b61136b2f67a949f9d2ed715ddf53673f93c013c614e946aa5ad"
     },
     "assets": {
       "source": "stellar/stellar-dev-skill",
       "sourceType": "github",
       "skillPath": "skills/assets/SKILL.md",
-      "computedHash": "16c00358fa5ba0cc56d448152c0fd508e071b8984b931e71b1198d9465dacbf9"
+      "computedHash": "421824ca166f61aae7fdef8addd0cbae7d223270b70bb21c039834bf165a27f8"
     },
     "dapp": {
       "source": "stellar/stellar-dev-skill",
       "sourceType": "github",
       "skillPath": "skills/dapp/SKILL.md",
-      "computedHash": "31a6d867181a75a9a8e08ad4d1197d641edc9109f8e94ab05bcf6615b5f35f57"
+      "computedHash": "c21d4792f082f7c8df0835541b0df4dd9a674a8813b7b42229a5b7c8ba68a024"
     },
     "data": {
       "source": "stellar/stellar-dev-skill",
       "sourceType": "github",
       "skillPath": "skills/data/SKILL.md",
-      "computedHash": "c7c38e73ad94f216bdaa03a4ed14d3c29314a068f7f7057f3e01855f722f9711"
+      "computedHash": "8e3be4428f57e20a84afc3a4c705814be17b75fa0a7decc039dca98046aa7fa6"
+    },
+    "smart-contracts": {
+      "source": "stellar/stellar-dev-skill",
+      "sourceType": "github",
+      "skillPath": "skills/smart-contracts/SKILL.md",
+      "computedHash": "2e93bd4775f9e58710309b884211e225b994383829e10cd3a9eb6ff12a7a6bfd"
     },
     "soroban": {
       "source": "stellar/stellar-dev-skill",
@@ -35,13 +41,13 @@
       "source": "stellar/stellar-dev-skill",
       "sourceType": "github",
       "skillPath": "skills/standards/SKILL.md",
-      "computedHash": "be988e5ab628a242ea1d26ba85c71d8a044dfb6a61ad241f04909fd5301f6729"
+      "computedHash": "5e00e5dc6adfbd2ca19b403a844fc951bd538447acfc0576c00d12f4cf6c89b4"
     },
     "zk-proofs": {
       "source": "stellar/stellar-dev-skill",
       "sourceType": "github",
       "skillPath": "skills/zk-proofs/SKILL.md",
-      "computedHash": "1425ff3c98ee963bcb0bb13d620df0d637e969201797e0974c1debe0dfa6c885"
+      "computedHash": "94d4b1ab099334627e838d12fba7fc512a3e3d44defecd08c0c68b449229be32"
     }
   }
 }

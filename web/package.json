@@ -36,6 +36,7 @@
   "overrides": {
     "axios": "^1.7.9",
     "postcss": "^8.4.31",
-    "jose": "4.15.5"
+    "jose": "4.15.5",
+    "@stellar/stellar-sdk": "^15.1.0"
   }
 }
