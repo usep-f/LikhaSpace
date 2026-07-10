@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
-import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, ShieldAlert } from 'lucide-react';
+import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, ShieldAlert, Wallet, QrCode } from 'lucide-react';
 import { Order, Gig, FreelancerProfile } from '@/lib/types';
 import { ChatModal } from '@/components/ChatModal';
 import { DeliverablesModal } from '@/components/DeliverablesModal';
@@ -11,6 +11,7 @@ import { StatusModal } from '@/components/StatusModal';
 import { CancelModal } from '@/components/CancelModal';
 import { DisputeModal } from '@/components/DisputeModal';
 import { ReviewModal } from '@/components/ReviewModal';
+import { QRPhPaymentModal } from '@/components/QRPhPaymentModal';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
@@ -73,6 +74,7 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeDisputeOrder, setActiveDisputeOrder] = useState<Order | null>(null);
   const [activeReviewOrder, setActiveReviewOrder] = useState<Order | null>(null);
   const [activeFreelancerProfile, setActiveFreelancerProfile] = useState<FreelancerProfile | null>(null);
+  const [activeQRPhOrder, setActiveQRPhOrder] = useState<Order | null>(null);
 
   const { showToast, showLoading, hideLoading } = useNotification();
 
@@ -230,7 +232,12 @@ export const ActiveProjectsView: React.FC = () => {
     if (!address || !order.txHash) return showToast('Missing contract or wallet data', 'error');
     try {
       showLoading('Canceling project with kill fee on-chain...');
-      await clientCancelWithKillFee(order.txHash, address);
+      if (order.relayerSecret) {
+        const { clientCancelWithKillFeeWithKeypair } = await import('@/lib/onramp');
+        await clientCancelWithKillFeeWithKeypair(order.txHash, order.relayerSecret);
+      } else {
+        await clientCancelWithKillFee(order.txHash, address);
+      }
 
       const newChangelog = {
         id: crypto.randomUUID(),
@@ -305,8 +312,12 @@ export const ActiveProjectsView: React.FC = () => {
     const order = clientOrders.find(o => o.id === orderId);
     if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
     try {
-      showLoading(`Approving deliverables for order on-chain...`);
-      await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address));
+      if (order.relayerSecret) {
+        const { acceptDeliverableWithKeypair } = await import('@/lib/onramp');
+        await acceptDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+      } else {
+        await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address));
+      }
       
       const milestones = order.milestones ? [...order.milestones] : [];
       const currentIdx = order.currentMilestoneIdx || 0;
@@ -370,8 +381,12 @@ export const ActiveProjectsView: React.FC = () => {
     const order = clientOrders.find(o => o.id === orderId);
     if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
     try {
-      showLoading(`Denying deliverables on-chain...`);
-      await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address));
+      if (order.relayerSecret) {
+        const { denyDeliverableWithKeypair } = await import('@/lib/onramp');
+        await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+      } else {
+        await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address));
+      }
       
       const milestones = order.milestones ? [...order.milestones] : [];
       const currentIdx = order.currentMilestoneIdx || 0;
@@ -422,10 +437,15 @@ export const ActiveProjectsView: React.FC = () => {
       // Assume paid revision price is 1000 ($10) as in deployment
       const totalXlmRequired = (BigInt(1000) * BigInt(stroopsPerCent)).toString();
       
-      const contract = await import('@/lib/contract');
-      await contract.payForRevision(order.txHash!, address, totalXlmRequired);
-      
-      await contract.denyDeliverable(order.txHash!, address);
+      if (order.relayerSecret) {
+        const { payForRevisionWithKeypair, denyDeliverableWithKeypair } = await import('@/lib/onramp');
+        await payForRevisionWithKeypair(order.txHash!, order.relayerSecret, totalXlmRequired);
+        await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+      } else {
+        const contract = await import('@/lib/contract');
+        await contract.payForRevision(order.txHash!, address, totalXlmRequired);
+        await contract.denyDeliverable(order.txHash!, address);
+      }
       
       const milestones = order.milestones ? [...order.milestones] : [];
       const currentIdx = order.currentMilestoneIdx || 0;
@@ -571,13 +591,22 @@ export const ActiveProjectsView: React.FC = () => {
                 {order.status !== 'pending_acceptance' && (
                   <>
                     {order.status === 'awaiting_funding' && (
-                      <button
-                        title="Fund Escrow"
-                        onClick={() => handleFundEscrow(order)}
-                        className="p-2.5 rounded border bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)] transition-colors"
-                      >
-                        <Activity className="w-5 h-5" />
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          title="Fund via Wallet (XLM)"
+                          onClick={() => handleFundEscrow(order)}
+                          className="p-2.5 rounded border border-white/10 text-white hover:bg-white/5 cursor-pointer transition-colors"
+                        >
+                          <Wallet className="w-5 h-5" />
+                        </button>
+                        <button
+                          title="Fund via GCash (QR Ph)"
+                          onClick={() => setActiveQRPhOrder(order)}
+                          className="p-2.5 rounded border bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)] transition-colors"
+                        >
+                          <QrCode className="w-5 h-5" />
+                        </button>
+                      </div>
                     )}
                     {(order.status === 'escrow_funded' || order.status === 'delivered') && (
                       <button
@@ -710,6 +739,14 @@ export const ActiveProjectsView: React.FC = () => {
         <ProfileModal
           profile={activeFreelancerProfile}
           onClose={() => setActiveFreelancerProfile(null)}
+        />
+      )}
+
+      {activeQRPhOrder && (
+        <QRPhPaymentModal
+          order={activeQRPhOrder}
+          onClose={() => setActiveQRPhOrder(null)}
+          onSuccess={() => setActiveQRPhOrder(null)}
         />
       )}
     </div>

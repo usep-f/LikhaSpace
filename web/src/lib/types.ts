@@ -79,6 +79,7 @@ export interface Order {
 
   // On-Chain Verification
   txHash?: string;
+  relayerSecret?: string;
 
   // Rating/Review for completed orders
   review?: {
