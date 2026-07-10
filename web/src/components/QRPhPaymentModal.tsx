@@ -52,7 +52,8 @@ export const QRPhPaymentModal: React.FC<QRPhPaymentModalProps> = ({ order, onClo
       const { contractId, secret } = await onRampFundEscrow(
         order.freelancerAddress,
         order.priceUSD,
-        milestonesConfig
+        milestonesConfig,
+        order.currency || 'XLM'
       );
 
       setStep('Updating order on-chain state...');

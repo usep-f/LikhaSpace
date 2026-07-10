@@ -12,6 +12,7 @@ import { CancelModal } from '@/components/CancelModal';
 import { DisputeModal } from '@/components/DisputeModal';
 import { ReviewModal } from '@/components/ReviewModal';
 import { QRPhPaymentModal } from '@/components/QRPhPaymentModal';
+import { TokenSelectionModal } from '@/components/TokenSelectionModal';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
@@ -53,7 +54,10 @@ function getMilestonesConfig(order: Order) {
   }];
 }
 
-async function checkEscrowBalance(address: string, priceUSD: number): Promise<boolean> {
+async function checkEscrowBalance(address: string, priceUSD: number, currency: 'XLM' | 'USDC' = 'XLM'): Promise<boolean> {
+  if (currency === 'USDC') {
+    return true; // Assume enough USDC for testnet
+  }
   const balanceXlm = await getXlmBalance(address);
   const requiredXlm = await getRequiredXlmForGig(priceUSD);
   return balanceXlm >= requiredXlm + 5;
@@ -75,6 +79,8 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeReviewOrder, setActiveReviewOrder] = useState<Order | null>(null);
   const [activeFreelancerProfile, setActiveFreelancerProfile] = useState<FreelancerProfile | null>(null);
   const [activeQRPhOrder, setActiveQRPhOrder] = useState<Order | null>(null);
+  const [activeTokenSelectionOrder, setActiveTokenSelectionOrder] = useState<Order | null>(null);
+  const [tokenSelectionType, setTokenSelectionType] = useState<'wallet' | 'qrph' | null>(null);
 
   const { showToast, showLoading, hideLoading } = useNotification();
 
@@ -123,12 +129,12 @@ export const ActiveProjectsView: React.FC = () => {
     return () => unsubscribe();
   }, [address]);
 
-  const handleFundEscrow = async (order: Order) => {
+  const handleFundEscrow = async (order: Order, currency: 'XLM' | 'USDC' = 'XLM') => {
     if (!address) return showToast('Wallet not connected', 'error');
     showToast('Checking wallet balance...', 'info');
     try {
       showLoading('Funding Escrow via Freighter...');
-      const hasBalance = await checkEscrowBalance(address, order.priceUSD);
+      const hasBalance = await checkEscrowBalance(address, order.priceUSD, currency);
       if (!hasBalance) {
         const requiredXlm = await getRequiredXlmForGig(order.priceUSD);
         const actualBal = await getXlmBalance(address);
@@ -140,11 +146,19 @@ export const ActiveProjectsView: React.FC = () => {
         address,
         order.freelancerAddress,
         1000,
-        getMilestonesConfig(order)
+        getMilestonesConfig(order),
+        currency
       );
-      const stroopsPerCent = await getOraclePrice();
-      const totalXlmRequired = (BigInt(order.priceUSD * 100) * BigInt(stroopsPerCent)).toString();
-      await fundEscrow(contractId, address, totalXlmRequired);
+      
+      let totalTokenRequired = '';
+      if (currency === 'USDC') {
+        totalTokenRequired = (BigInt(Math.round(order.priceUSD * 100)) * BigInt(100000)).toString();
+      } else {
+        const stroopsPerCent = await getOraclePrice();
+        totalTokenRequired = (BigInt(Math.round(order.priceUSD * 100)) * BigInt(stroopsPerCent)).toString();
+      }
+      
+      await fundEscrow(contractId, address, totalTokenRequired);
       
       const defaultMilestones = order.milestones?.length ? order.milestones.map((m, idx) => ({
         ...m,
@@ -593,15 +607,15 @@ export const ActiveProjectsView: React.FC = () => {
                     {order.status === 'awaiting_funding' && (
                       <div className="flex gap-2">
                         <button
-                          title="Fund via Wallet (XLM)"
-                          onClick={() => handleFundEscrow(order)}
+                          title="Fund via Wallet"
+                          onClick={() => { setActiveTokenSelectionOrder(order); setTokenSelectionType('wallet'); }}
                           className="p-2.5 rounded border border-white/10 text-white hover:bg-white/5 cursor-pointer transition-colors"
                         >
                           <Wallet className="w-5 h-5" />
                         </button>
                         <button
                           title="Fund via GCash (QR Ph)"
-                          onClick={() => setActiveQRPhOrder(order)}
+                          onClick={() => { setActiveTokenSelectionOrder(order); setTokenSelectionType('qrph'); }}
                           className="p-2.5 rounded border bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)] transition-colors"
                         >
                           <QrCode className="w-5 h-5" />
@@ -741,12 +755,25 @@ export const ActiveProjectsView: React.FC = () => {
           onClose={() => setActiveFreelancerProfile(null)}
         />
       )}
-
+      {activeTokenSelectionOrder && tokenSelectionType && (
+        <TokenSelectionModal
+          onClose={() => { setActiveTokenSelectionOrder(null); setTokenSelectionType(null); }}
+          onSelect={(currency) => {
+            if (tokenSelectionType === 'wallet') {
+              handleFundEscrow(activeTokenSelectionOrder, currency);
+            } else if (tokenSelectionType === 'qrph') {
+              setActiveQRPhOrder({ ...activeTokenSelectionOrder, currency });
+            }
+            setActiveTokenSelectionOrder(null);
+            setTokenSelectionType(null);
+          }}
+        />
+      )}
       {activeQRPhOrder && (
         <QRPhPaymentModal
           order={activeQRPhOrder}
           onClose={() => setActiveQRPhOrder(null)}
-          onSuccess={() => setActiveQRPhOrder(null)}
+          onSuccess={() => {setActiveQRPhOrder(null)}}
         />
       )}
     </div>

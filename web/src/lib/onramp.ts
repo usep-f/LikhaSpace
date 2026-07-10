@@ -7,6 +7,7 @@ import {
   rpc,
   xdr,
   Keypair,
+  Asset,
 } from '@stellar/stellar-sdk';
 import { server, NETWORK_PASSPHRASE, fundWithFriendbot } from './stellar';
 import { pollTransaction, getContractIdFromTxResult } from './stellarUtils';
@@ -15,6 +16,8 @@ import {
   ORACLE_ID,
   REPUTATION_CONTRACT_ID,
   TESTNET_XLM,
+  TESTNET_USDC_ISSUER,
+  TESTNET_USDC_CONTRACT_ID,
   DEFAULT_MEDIATOR,
   PLATFORM_TREASURY,
 } from './contractConstants';
@@ -67,7 +70,8 @@ async function submitTransactionWithKeypair(txBuilder: TransactionBuilder, keypa
 export async function onRampFundEscrow(
   freelancerAddress: string,
   priceUSD: number,
-  milestones: { payout_amount_usd: number; max_revisions: number }[]
+  milestones: { payout_amount_usd: number; max_revisions: number }[],
+  currency: 'XLM' | 'USDC' = 'XLM'
 ): Promise<{ contractId: string; secret: string }> {
   // 1. Generate a random sponsor keypair representing the on-ramp relayer
   const keypair = Keypair.random();
@@ -104,12 +108,13 @@ export async function onRampFundEscrow(
 
   // 5. Initialize the escrow contract
   const initAccount = await server.getAccount(sponsorAddress);
+  const tokenContractId = currency === 'USDC' ? TESTNET_USDC_CONTRACT_ID : TESTNET_XLM;
   const initTx = new TransactionBuilder(initAccount, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
     .addOperation(new Contract(contractId).call(
       'initialize',
       new Address(freelancerAddress).toScVal(),
       new Address(sponsorAddress).toScVal(),
-      new Address(TESTNET_XLM).toScVal(),
+      new Address(tokenContractId).toScVal(),
       new Address(ORACLE_ID).toScVal(),
       new Address(DEFAULT_MEDIATOR).toScVal(),
       new Address(PLATFORM_TREASURY).toScVal(),
@@ -121,8 +126,36 @@ export async function onRampFundEscrow(
   await submitTransactionWithKeypair(initTx, keypair);
 
   // 6. Fund the escrow contract
-  const stroopsPerCent = await getOraclePrice();
-  const totalXlmRequired = (BigInt(priceUSD * 100) * BigInt(stroopsPerCent)).toString();
+  let totalTokenRequired = '';
+  if (currency === 'USDC') {
+    // 1 USDC = 1 USD. Multiply by 10^7 for stroops
+    totalTokenRequired = (BigInt(Math.round(priceUSD * 100)) * BigInt(100000)).toString();
+    
+    // Perform DEX swap from XLM to USDC
+    const usdcAsset = new Asset('USDC', TESTNET_USDC_ISSUER);
+    const swapAccount = await server.getAccount(sponsorAddress);
+    
+    // We want to receive exactly `priceUSD` USDC.
+    const usdcAmount = priceUSD.toString();
+    // Overestimate max XLM to spend. Friendbot gives 10,000 XLM, so we have plenty.
+    // For safety, let's just use 1000 XLM as sendMax.
+    const sendMaxAmount = '1000';
+
+    const swapTx = new TransactionBuilder(swapAccount, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
+      .addOperation(Operation.changeTrust({ asset: usdcAsset }))
+      .addOperation(Operation.pathPaymentStrictReceive({
+        sendAsset: Asset.native(),
+        sendMax: sendMaxAmount,
+        destAsset: usdcAsset,
+        destAmount: usdcAmount,
+        destination: sponsorAddress,
+        path: []
+      }));
+    await submitTransactionWithKeypair(swapTx, keypair);
+  } else {
+    const stroopsPerCent = await getOraclePrice();
+    totalTokenRequired = (BigInt(Math.round(priceUSD * 100)) * BigInt(stroopsPerCent)).toString();
+  }
 
   const fundAccount = await server.getAccount(sponsorAddress);
   const contract = new Contract(contractId);
@@ -130,7 +163,7 @@ export async function onRampFundEscrow(
     .addOperation(
       contract.call('fund',
         new Address(sponsorAddress).toScVal(),
-        nativeToScVal(BigInt(totalXlmRequired), { type: 'i128' })
+        nativeToScVal(BigInt(totalTokenRequired), { type: 'i128' })
       )
     );
 
