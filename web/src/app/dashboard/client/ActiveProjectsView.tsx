@@ -64,7 +64,7 @@ async function checkEscrowBalance(address: string, priceUSD: number, currency: '
 }
 
 export const ActiveProjectsView: React.FC = () => {
-  const { address, userProfile } = useWallet();
+  const { uid, address, userProfile } = useWallet();
   const [clientOrders, setClientOrders] = useState<(Order & { gigInfo?: Gig })[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -128,8 +128,8 @@ export const ActiveProjectsView: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (!address) return;
-    const unsubscribe = subscribeToClientOrders(address, async (orders) => {
+    if (!uid) return;
+    const unsubscribe = subscribeToClientOrders(uid, async (orders) => {
       const enriched = await Promise.all(
         orders.map(async (o) => {
           const gigInfo = await getGig(o.gigId);
@@ -139,7 +139,7 @@ export const ActiveProjectsView: React.FC = () => {
       setClientOrders(enriched);
     });
     return () => unsubscribe();
-  }, [address]);
+  }, [uid]);
 
   const handleFundEscrow = async (order: Order, currency: 'XLM' | 'USDC' = 'XLM') => {
     if (!address) return showToast('Wallet not connected', 'error');
@@ -200,7 +200,7 @@ export const ActiveProjectsView: React.FC = () => {
       });
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Escrow Funded',
         message: `Escrow has been funded. You can now start working on the project!`,
@@ -237,7 +237,7 @@ export const ActiveProjectsView: React.FC = () => {
 
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Booking Cancelled',
         message: `The booking was cancelled by the client before funding.`,
@@ -255,7 +255,9 @@ export const ActiveProjectsView: React.FC = () => {
   };
 
   const handleCancelFunded = async (order: Order) => {
-    if (!address || !order.txHash) return showToast('Missing contract or wallet data', 'error');
+    if (!order.txHash) return showToast('Missing contract data', 'error');
+    const isRelayed = order.relayerSecret === 'treasury';
+    if (!isRelayed && !address) return showToast('Wallet connection required for this action', 'error');
     try {
       showLoading('Canceling project with kill fee on-chain...');
       if (order.relayerSecret) {
@@ -266,7 +268,7 @@ export const ActiveProjectsView: React.FC = () => {
           await clientCancelWithKillFeeWithKeypair(order.txHash, order.relayerSecret);
         }
       } else {
-        await clientCancelWithKillFee(order.txHash, address);
+        await clientCancelWithKillFee(order.txHash, address!);
       }
 
       const newChangelog = {
@@ -283,7 +285,7 @@ export const ActiveProjectsView: React.FC = () => {
 
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Project Cancelled',
         message: `The project was cancelled by the client. Current milestone payout paid as kill fee, future milestones refunded.`,
@@ -320,7 +322,7 @@ export const ActiveProjectsView: React.FC = () => {
 
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Dispute Initiated',
         message: `A dispute has been initiated for this project.`,
@@ -340,7 +342,9 @@ export const ActiveProjectsView: React.FC = () => {
 
   const handleApproveDeliverables = async (orderId: string) => {
     const order = clientOrders.find(o => o.id === orderId);
-    if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
+    if (!order || !order.txHash) return showToast('Error: Missing contract data', 'error');
+    const isRelayed = order.relayerSecret === 'treasury';
+    if (!isRelayed && !address) return showToast('Wallet connection required for this action', 'error');
     try {
       if (order.relayerSecret) {
         if (order.relayerSecret === 'treasury') {
@@ -350,7 +354,7 @@ export const ActiveProjectsView: React.FC = () => {
           await acceptDeliverableWithKeypair(order.txHash!, order.relayerSecret);
         }
       } else {
-        await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address));
+        await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address!));
       }
       
       const milestones = order.milestones ? [...order.milestones] : [];
@@ -388,7 +392,7 @@ export const ActiveProjectsView: React.FC = () => {
       
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: hasNext ? 'Milestone Approved' : 'Project Completed',
         message: hasNext 
@@ -413,7 +417,9 @@ export const ActiveProjectsView: React.FC = () => {
 
   const handleDenyDeliverables = async (orderId: string, reason: string) => {
     const order = clientOrders.find(o => o.id === orderId);
-    if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
+    if (!order || !order.txHash) return showToast('Error: Missing contract data', 'error');
+    const isRelayed = order.relayerSecret === 'treasury';
+    if (!isRelayed && !address) return showToast('Wallet connection required for this action', 'error');
     try {
       if (order.relayerSecret) {
         if (order.relayerSecret === 'treasury') {
@@ -423,7 +429,7 @@ export const ActiveProjectsView: React.FC = () => {
           await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
         }
       } else {
-        await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address));
+        await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address!));
       }
       
       const milestones = order.milestones ? [...order.milestones] : [];
@@ -448,7 +454,7 @@ export const ActiveProjectsView: React.FC = () => {
       });
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Revision Requested',
         message: `Client requested a revision: "${reason}"`,
@@ -467,12 +473,13 @@ export const ActiveProjectsView: React.FC = () => {
 
   const handlePayForRevision = async (orderId: string, reason: string) => {
     const order = clientOrders.find(o => o.id === orderId);
-    if (!order || !order.txHash || !address) return showToast('Error: Missing data', 'error');
+    if (!order || !order.txHash) return showToast('Error: Missing data', 'error');
+    const isRelayed = order.relayerSecret === 'treasury';
+    if (!isRelayed && !address) return showToast('Wallet connection required for this action', 'error');
     
     try {
       showLoading(`Paying for additional revision on-chain...`);
       const stroopsPerCent = await getOraclePrice();
-      // Assume paid revision price is 1000 ($10) as in deployment
       const totalXlmRequired = (BigInt(1000) * BigInt(stroopsPerCent)).toString();
       
       if (order.relayerSecret) {
@@ -486,8 +493,8 @@ export const ActiveProjectsView: React.FC = () => {
         }
       } else {
         const contract = await import('@/lib/contract');
-        await contract.payForRevision(order.txHash!, address, totalXlmRequired);
-        await contract.denyDeliverable(order.txHash!, address);
+        await contract.payForRevision(order.txHash!, address!, totalXlmRequired);
+        await contract.denyDeliverable(order.txHash!, address!);
       }
       
       const milestones = order.milestones ? [...order.milestones] : [];
@@ -513,7 +520,7 @@ export const ActiveProjectsView: React.FC = () => {
       });
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: address || uid || '',
         senderName: userProfile?.name || 'Client',
         title: 'Revision Requested',
         message: `Client requested a revision: "${reason}"`,

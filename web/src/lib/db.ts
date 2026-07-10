@@ -25,12 +25,23 @@ export async function deleteGig(gigId: string) {
   await deleteDoc(doc(db, 'gigs', gigId));
 }
 
-export async function getUserProfile(address: string) {
-  const docRef = doc(db, 'users', address);
+export async function getUserProfile(uidOrAddress: string) {
+  // 1. Try to fetch by document ID first (which is either Google UID or direct wallet address)
+  const docRef = doc(db, 'users', uidOrAddress);
   const snap = await getDoc(docRef);
   if (snap.exists()) {
     return snap.data();
   }
+
+  // 2. If not found, check if uidOrAddress is a Stellar address and search the collection
+  if (uidOrAddress.length === 56 && uidOrAddress.startsWith('G')) {
+    const q = query(collection(db, 'users'), where('stellarAddress', '==', uidOrAddress));
+    const querySnap = await getDocs(q);
+    if (!querySnap.empty) {
+      return querySnap.docs[0].data();
+    }
+  }
+
   return null;
 }
 

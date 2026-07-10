@@ -11,14 +11,14 @@ import { OverviewView } from './OverviewView';
 import { HistoryView } from './HistoryView';
 
 export default function ClientDashboard() {
-  const { isConnected, address, isLoading, role, isRegistered, userProfile } = useWallet();
+  const { uid, isConnected, address, isLoading, role, isRegistered, userProfile } = useWallet();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     if (isLoading) return;
     
-    if (!isConnected || !address || !isRegistered) {
+    if (!isConnected || !isRegistered) {
       router.push('/');
       return;
     }
@@ -32,7 +32,7 @@ export default function ClientDashboard() {
         router.push('/');
       }
     }
-  }, [isLoading, isConnected, address, role, isRegistered, router]);
+  }, [isLoading, isConnected, role, isRegistered, router]);
 
   if (isLoading) {
     return (
@@ -60,7 +60,7 @@ export default function ClientDashboard() {
       <div className="mt-8">
         <DashboardTabs active={activeTab} onTabChange={setActiveTab} />
 
-        {activeTab === 'overview' && <OverviewView profile={userProfile ? { ...userProfile, address: address as string } as FreelancerProfile : null} />}
+        {activeTab === 'overview' && <OverviewView profile={userProfile ? { ...userProfile, address: (address || uid) as string } as FreelancerProfile : null} />}
         {activeTab === 'active_projects' && <ActiveProjectsView />}
         {activeTab === 'history' && <HistoryView />}
       </div>

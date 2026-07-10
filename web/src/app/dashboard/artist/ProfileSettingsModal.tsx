@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
 import { profileSettingsSchema, sanitizeInput } from '@/lib/validation';
-import { X } from 'lucide-react';
+import { X, Wallet, ShieldCheck } from 'lucide-react';
 
 export interface ProfileSettingsModalProps {
   onClose: () => void;
 }
 
 export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onClose }) => {
-  const { userProfile, registerProfile, deleteProfile } = useWallet();
+  const { userProfile, registerProfile, deleteProfile, uid, address, linkWallet } = useWallet();
   const { showToast, showConfirm, showLoading, hideLoading } = useNotification();
   const [formData, setFormData] = useState({
     name: userProfile?.name || '',
@@ -148,6 +148,65 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
                   <input type="url" name="portfolio" value={formData.portfolio} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-hotpink transition-colors" placeholder="https://yourwebsite.com" />
                 </div>
               </div>
+            </div>
+
+            <div className="border-t border-white/5 pt-4 mt-6">
+              <h4 className="text-sm font-bold text-white mb-4">Stellar Integration</h4>
+              {uid && uid.startsWith('G') && uid.length === 56 ? (
+                <div className="bg-violet-dark/30 border border-[#eab308]/20 p-4 rounded-lg flex items-center gap-3">
+                  <div className="p-2 bg-[#eab308]/10 rounded-lg">
+                    <Wallet className="w-5 h-5 text-[#eab308]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">Authenticated via Stellar Wallet</p>
+                    <p className="text-[10px] text-gray-400 font-mono mt-0.5">{address}</p>
+                  </div>
+                </div>
+              ) : address ? (
+                <div className="bg-violet-dark/30 border border-neongreen/20 p-4 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-neongreen/10 rounded-lg">
+                      <ShieldCheck className="w-5 h-5 text-neongreen" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">Linked Stellar Wallet</p>
+                      <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+                        {address.slice(0, 8)}...{address.slice(-8)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-neongreen bg-neongreen/10 px-2 py-1 rounded border border-neongreen/20">
+                    Verified
+                  </span>
+                </div>
+              ) : (
+                <div className="bg-violet-dark/30 border border-white/5 p-4 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-white/5 rounded-lg shrink-0 mt-0.5">
+                      <Wallet className="w-5 h-5 text-gray-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">No Stellar Wallet Linked</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Link a Freighter wallet to receive on-chain payouts from escrows.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await linkWallet();
+                      } catch {
+                        // error is already toasted inside linkWallet
+                      }
+                    }}
+                    className="px-4 py-2 bg-hotpink/10 border border-hotpink/30 text-hotpink font-bold text-xs rounded hover:bg-hotpink/20 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    Link Wallet
+                  </button>
+                </div>
+              )}
             </div>
           </form>
         </div>

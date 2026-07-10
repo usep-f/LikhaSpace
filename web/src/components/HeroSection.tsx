@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { useWallet } from '@/context/WalletContext';
 import { Search, ArrowRight } from 'lucide-react';
+import { LoginModal } from '@/components/LoginModal';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { TypewriterText } from '@/components/ui/TypewriterText';
@@ -89,7 +90,7 @@ const HeroCTAs: React.FC<HeroCTAsProps> = ({
         onClick={onConnect}
         className="btn-primary bg-hotpink hover:bg-hotpink/85 text-white border border-hotpink/45 hover:shadow-[0_0_14px_rgba(255,0,127,0.4)] flex items-center space-x-2 px-6 py-3 rounded-lg font-heading text-sm font-bold cursor-pointer transition-all duration-200"
       >
-        <span>Get Started / Connect Wallet</span>
+        <span>Get Started / Login</span>
         <ArrowRight className="w-4 h-4" />
       </button>
     )}
@@ -117,7 +118,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   searchVal,
   onSearchChange,
 }) => {
-  const { isConnected, role, connectWallet } = useWallet();
+  const { isConnected, role } = useWallet();
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const router = useRouter();
   const prefersReduced = useReducedMotion();
 
@@ -134,7 +136,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const handleLine2Done = useCallback(() => setPhase(2), []);
 
   const handleConnectAction = () => {
-    if (!isConnected) void connectWallet();
+    if (!isConnected) setShowLoginModal(true);
   };
 
   const handleSearchSubmit = (term: string) => {
@@ -249,6 +251,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <div className="hidden lg:col-span-6 lg:block" />
         </div>
       </div>
+      {showLoginModal && (
+        <LoginModal onClose={() => setShowLoginModal(false)} />
+      )}
     </section>
   );
 };

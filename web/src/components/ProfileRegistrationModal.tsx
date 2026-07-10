@@ -14,7 +14,7 @@ import { StepSuccess } from './onboarding/StepSuccess';
 
 export default function ProfileRegistrationModal() {
   const router = useRouter();
-  const { address, isRegistered, isConnected, registerProfile, hasAttemptedLogin, selectRole, role } = useWallet();
+  const { uid, isRegistered, isConnected, registerProfile, hasAttemptedLogin, selectRole, role } = useWallet();
   const { showToast, showLoading, hideLoading } = useNotification();
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -35,7 +35,7 @@ export default function ProfileRegistrationModal() {
     portfolio: '',
   });
 
-  if (!isConnected || !address || isRegistered || !hasAttemptedLogin) {
+  if (!isConnected || !uid || isRegistered || !hasAttemptedLogin) {
     return null;
   }
 

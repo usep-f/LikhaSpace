@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
-import { Wallet, LogOut, LayoutDashboard, Globe } from 'lucide-react';
+import { LogOut, LayoutDashboard, Globe, LogIn } from 'lucide-react';
 import Link from 'next/link';
 import { NotificationBell } from './NotificationBell';
+import { LoginModal } from '@/components/LoginModal';
 
 // Sub-component: Brand Logo
 const BrandLogo: React.FC = () => (
@@ -41,23 +42,23 @@ const ConnectButtons: React.FC<WalletButtonProps> = ({ onConnect, isLoading }) =
       disabled={isLoading}
       className="btn-primary flex items-center space-x-2 bg-hotpink text-white hover:bg-hotpink/85 border border-hotpink/50 hover:shadow-[0_0_12px_rgba(255,0,127,0.4)] px-3 py-1.5 rounded-lg font-heading text-xs font-semibold cursor-pointer transition-all duration-200"
     >
-      <Wallet className="w-3.5 h-3.5" />
-      <span>{isLoading ? 'Connecting...' : 'Freighter'}</span>
+      <LogIn className="w-3.5 h-3.5" />
+      <span>{isLoading ? 'Logging in...' : 'Login'}</span>
     </button>
   </div>
 );
 
 // Sub-component: Connected User Profile Box
 interface ProfileBoxProps {
-  address: string;
+  address: string | null;
   name?: string;
   role: string | null;
   onDisconnect: () => void;
 }
 
 const ProfileBox: React.FC<ProfileBoxProps> = ({ address, name, role, onDisconnect }) => {
-  const shortAddress = `${address.slice(0, 4)}...${address.slice(-4)}`;
-  const displayName = name || shortAddress;
+  const shortAddress = address ? `${address.slice(0, 4)}...${address.slice(-4)}` : '';
+  const displayName = name || shortAddress || 'User';
   return (
     <div className="flex items-center space-x-3 bg-violet-dark/50 border border-white/10 px-2.5 py-1 rounded-lg">
       <div className="text-right">
@@ -68,7 +69,7 @@ const ProfileBox: React.FC<ProfileBoxProps> = ({ address, name, role, onDisconne
       </div>
       <button
         onClick={onDisconnect}
-        title="Disconnect Wallet"
+        title="Log Out"
         className="text-gray-400 hover:text-hotpink hover:text-glow-pink cursor-pointer transition-all duration-200 p-1 hover:bg-white/5 rounded"
       >
         <LogOut className="w-3.5 h-3.5" />
@@ -78,7 +79,8 @@ const ProfileBox: React.FC<ProfileBoxProps> = ({ address, name, role, onDisconne
 };
 
 export const Navbar: React.FC = () => {
-  const { address, role, isConnected, isLoading, connectWallet, disconnectWallet, userProfile } = useWallet();
+  const { uid, address, role, isConnected, isLoading, disconnectWallet, userProfile } = useWallet();
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   const dashboardUrl = role === 'artist' 
     ? '/dashboard/artist' 
@@ -120,17 +122,20 @@ export const Navbar: React.FC = () => {
               )}
             </div>
 
-            {isConnected && address ? (
+            {isConnected && uid ? (
               <>
                 <NotificationBell />
                 <ProfileBox address={address} name={userProfile?.name} role={role} onDisconnect={disconnectWallet} />
               </>
             ) : (
-              <ConnectButtons onConnect={connectWallet} isLoading={isLoading} />
+              <ConnectButtons onConnect={() => setShowLoginModal(true)} isLoading={isLoading} />
             )}
           </div>
         </div>
       </div>
+      {showLoginModal && (
+        <LoginModal onClose={() => setShowLoginModal(false)} />
+      )}
     </nav>
   );
 };

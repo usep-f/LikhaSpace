@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc, deleteDoc, DocumentData, collection, query, where, getDocs } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
 import { useNotification } from './NotificationContext';
 import { loginWithStellar } from '../lib/auth';
@@ -22,9 +22,11 @@ export interface UserProfile {
   linkedin?: string;
   twitter?: string;
   portfolio?: string;
+  stellarAddress?: string;
 }
 
 interface WalletContextProps {
+  uid: string | null;
   address: string | null;
   role: UserRole | null;
   userProfile: UserProfile | null;
@@ -34,6 +36,8 @@ interface WalletContextProps {
   hasAttemptedLogin: boolean;
   error: string | null;
   connectWallet: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  linkWallet: () => Promise<void>;
   disconnectWallet: () => void;
   selectRole: (role: UserRole) => void;
   registerProfile: (profile: UserProfile) => Promise<void>;
@@ -57,9 +61,11 @@ const mapFirebaseToProfile = (data: DocumentData): UserProfile => ({
   linkedin: data.linkedin || '',
   twitter: data.twitter || '',
   portfolio: data.portfolio || '',
+  stellarAddress: data.stellarAddress || '',
 });
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [uid, setUid] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole | null>(() => {
     if (typeof window !== 'undefined') {
@@ -73,11 +79,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasAttemptedLogin, setHasAttemptedLogin] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const { showToast } = useNotification();
+  const { showToast, showLoading, hideLoading } = useNotification();
 
-  const fetchProfileFromFirebase = useCallback(async (publicKey: string) => {
+  const fetchProfileFromFirebase = useCallback(async (userUid: string) => {
     try {
-      const docRef = doc(db, 'users', publicKey);
+      const docRef = doc(db, 'users', userUid);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -93,13 +99,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setRole(fetchedRole);
           localStorage.setItem(STORAGE_ROLE_KEY, fetchedRole);
         }
+        return data;
       } else {
         setUserProfile(null);
         setIsRegistered(false);
+        return null;
       }
     } catch (err: unknown) {
       console.error('Error fetching profile from Firebase:', err);
       setError(err instanceof Error ? err.message : 'Failed to load profile data');
+      return null;
     }
   }, []);
 
@@ -107,12 +116,22 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        const userAddress = firebaseUser.uid;
-        setAddress(userAddress);
+        const currentUid = firebaseUser.uid;
+        setUid(currentUid);
         setIsConnected(true);
         setError(null);
-        await fetchProfileFromFirebase(userAddress);
+        const profileData = await fetchProfileFromFirebase(currentUid);
+        
+        // Determine Stellar wallet address
+        if (currentUid.length === 56 && currentUid.startsWith('G')) {
+          setAddress(currentUid);
+        } else if (profileData && profileData.stellarAddress) {
+          setAddress(profileData.stellarAddress);
+        } else {
+          setAddress(null);
+        }
       } else {
+        setUid(null);
         setAddress(null);
         setRole(null);
         setUserProfile(null);
@@ -153,8 +172,87 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      setHasAttemptedLogin(true);
+      await signInWithPopup(auth, provider);
+    } catch (err: unknown) {
+      console.error('Google login error:', err);
+      let errMsg = 'Failed to login with Google.';
+      if (err instanceof Error) {
+        errMsg = err.message;
+      }
+      setError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const linkWallet = async () => {
+    if (!uid) {
+      throw new Error('You must be logged in to link a wallet.');
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { address: walletAddr } = await StellarWalletsKit.authModal();
+      if (!walletAddr) {
+        throw new Error('No public key returned from wallet.');
+      }
+
+      showLoading('Verifying wallet link...');
+
+      // Check 1: Is this wallet registered as a standalone account?
+      const standaloneRef = doc(db, 'users', walletAddr);
+      const standaloneSnap = await getDoc(standaloneRef);
+      if (standaloneSnap.exists() && standaloneSnap.data().name) {
+        throw new Error(
+          'This Stellar wallet is already registered to a standalone account. Please log in directly with your wallet or choose a different wallet to link.'
+        );
+      }
+
+      // Check 2: Is this wallet already linked to another user account?
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('stellarAddress', '==', walletAddr));
+      const querySnap = await getDocs(q);
+      const otherLinks = querySnap.docs.filter((docSnap) => docSnap.id !== uid);
+      if (otherLinks.length > 0) {
+        throw new Error(
+          'This Stellar wallet is already registered to a standalone account. Please log in directly with your wallet or choose a different wallet to link.'
+        );
+      }
+
+      // Perform link
+      const userRef = doc(db, 'users', uid);
+      await setDoc(userRef, { stellarAddress: walletAddr }, { merge: true });
+
+      setAddress(walletAddr);
+      await fetchProfileFromFirebase(uid);
+      showToast('Wallet successfully linked!', 'success');
+    } catch (err: unknown) {
+      console.error('Link wallet error:', err);
+      let errMsg = 'Failed to link wallet.';
+      if (err instanceof Error) {
+        errMsg = err.message;
+      }
+      if (errMsg !== 'The user closed the modal.') {
+        setError(errMsg);
+        showToast(errMsg, 'error');
+      }
+      throw err;
+    } finally {
+      hideLoading();
+      setIsLoading(false);
+    }
+  };
+
   const disconnectWallet = () => {
     void signOut(auth).catch(() => {});
+    setUid(null);
     setAddress(null);
     setRole(null);
     setUserProfile(null);
@@ -179,16 +277,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const registerProfile = async (profile: UserProfile) => {
-    if (!address) return;
+    if (!uid) return;
     setIsLoading(true);
     try {
-      const docRef = doc(db, 'users', address);
+      const docRef = doc(db, 'users', uid);
       const payload: Record<string, unknown> = {
         ...profile,
         updatedAt: new Date().toISOString(),
       };
       if (role) {
         payload.role = role;
+      }
+      if (address && address !== uid) {
+        payload.stellarAddress = address;
       }
       await setDoc(docRef, payload, { merge: true });
       setUserProfile(profile);
@@ -203,13 +304,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const deleteProfile = async () => {
-    if (!address) return;
+    if (!uid) return;
     setIsLoading(true);
     try {
-      const docRef = doc(db, 'users', address);
+      const docRef = doc(db, 'users', uid);
       await deleteDoc(docRef);
 
-      const gigsQuery = query(collection(db, 'gigs'), where('freelancerAddress', '==', address));
+      const gigsQuery = query(collection(db, 'gigs'), where('freelancerAddress', '==', address || uid));
       const gigsSnap = await getDocs(gigsQuery);
       
       const deletePromises = gigsSnap.docs.map((docItem) => deleteDoc(docItem.ref));
@@ -232,6 +333,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   return (
     <WalletContext.Provider
       value={{
+        uid,
         address,
         role,
         userProfile,
@@ -241,6 +343,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         hasAttemptedLogin,
         error,
         connectWallet,
+        loginWithGoogle,
+        linkWallet,
         disconnectWallet,
         selectRole,
         registerProfile,
