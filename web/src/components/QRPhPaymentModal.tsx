@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, Activity } from 'lucide-react';
 import { Order } from '@/lib/types';
-import { onRampFundEscrow } from '@/lib/onramp';
+
 import { updateOrderStatus, createNotification } from '@/lib/db';
 import { useNotification } from '@/context/NotificationContext';
 
@@ -49,12 +49,24 @@ export const QRPhPaymentModal: React.FC<QRPhPaymentModalProps> = ({ order, onClo
     try {
       const milestonesConfig = getMilestonesConfig(order);
       
-      const { contractId, secret } = await onRampFundEscrow(
-        order.freelancerAddress,
-        order.priceUSD,
-        milestonesConfig,
-        order.currency || 'XLM'
-      );
+      const res = await fetch('/api/onramp/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          freelancerAddress: order.freelancerAddress,
+          priceUSD: order.priceUSD,
+          currency: order.currency || 'XLM',
+          milestones: milestonesConfig,
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to simulate on-ramp payment');
+      }
+
+      const { contractId, relayerAddress } = await res.json();
 
       setStep('Updating order on-chain state...');
       const defaultMilestones = order.milestones?.length ? order.milestones.map((m, idx) => ({
@@ -78,7 +90,7 @@ export const QRPhPaymentModal: React.FC<QRPhPaymentModalProps> = ({ order, onClo
       await updateOrderStatus(order.id, { 
         status: 'escrow_funded', 
         txHash: contractId,
-        relayerSecret: secret, // Store secret key for signing client actions
+        relayerSecret: 'treasury', // Flag indicating this is managed by the Treasury backend
         milestones: defaultMilestones,
         currentMilestoneIdx: 0,
         progressPercentage: 0,

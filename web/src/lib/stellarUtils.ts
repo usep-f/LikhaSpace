@@ -3,6 +3,7 @@ import {
   rpc,
   xdr,
   Address,
+  Keypair,
 } from '@stellar/stellar-sdk';
 import { server, NETWORK_PASSPHRASE } from './stellar';
 import { StellarWalletsKit } from './walletKit';
@@ -32,6 +33,23 @@ export async function submitTransaction(txBuilder: TransactionBuilder) {
   
   const signedTx = TransactionBuilder.fromXDR(signedTxXdr, NETWORK_PASSPHRASE);
   const submission = await server.sendTransaction(signedTx);
+  if (submission.status === 'ERROR') {
+    const errXdr = submission.errorResult ? submission.errorResult.toXDR('base64') : 'Unknown error';
+    throw new Error(`Submission failed: ${errXdr}`);
+  }
+  return pollTransaction(submission.hash);
+}
+
+export async function submitTransactionWithKeypair(txBuilder: TransactionBuilder, keypair: Keypair) {
+  const tx = txBuilder.setTimeout(100).build();
+  const simResponse = await server.simulateTransaction(tx);
+  if (rpc.Api.isSimulationError(simResponse)) {
+    throw new Error(`Simulation failed: ${simResponse.error}`);
+  }
+  const assembledTx = rpc.assembleTransaction(tx, simResponse).build();
+  assembledTx.sign(keypair);
+  
+  const submission = await server.sendTransaction(assembledTx);
   if (submission.status === 'ERROR') {
     const errXdr = submission.errorResult ? submission.errorResult.toXDR('base64') : 'Unknown error';
     throw new Error(`Submission failed: ${errXdr}`);

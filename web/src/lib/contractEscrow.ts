@@ -25,7 +25,7 @@ import {
   PLATFORM_TREASURY,
 } from './contractConstants';
 
-function buildMilestonesScVal(
+export function buildMilestonesScVal(
   milestones: { payout_amount_usd: number; max_revisions: number }[]
 ): xdr.ScVal {
   const scvMilestones = milestones.map(m => {

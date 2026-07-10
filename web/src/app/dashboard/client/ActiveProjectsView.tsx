@@ -84,6 +84,18 @@ export const ActiveProjectsView: React.FC = () => {
 
   const { showToast, showLoading, hideLoading } = useNotification();
 
+  const performRelayedAction = async (action: string, contractId: string, extraArgs: Record<string, unknown> = {}) => {
+    const res = await fetch('/api/onramp/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, contractId, ...extraArgs })
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to execute relayed action');
+    }
+  };
+
   const handleViewFreelancerProfile = async (freelancerAddress: string) => {
     showLoading('Loading freelancer profile...');
     try {
@@ -247,8 +259,12 @@ export const ActiveProjectsView: React.FC = () => {
     try {
       showLoading('Canceling project with kill fee on-chain...');
       if (order.relayerSecret) {
-        const { clientCancelWithKillFeeWithKeypair } = await import('@/lib/onramp');
-        await clientCancelWithKillFeeWithKeypair(order.txHash, order.relayerSecret);
+        if (order.relayerSecret === 'treasury') {
+          await performRelayedAction('cancel', order.txHash);
+        } else {
+          const { clientCancelWithKillFeeWithKeypair } = await import('@/lib/onramp');
+          await clientCancelWithKillFeeWithKeypair(order.txHash, order.relayerSecret);
+        }
       } else {
         await clientCancelWithKillFee(order.txHash, address);
       }
@@ -327,8 +343,12 @@ export const ActiveProjectsView: React.FC = () => {
     if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
     try {
       if (order.relayerSecret) {
-        const { acceptDeliverableWithKeypair } = await import('@/lib/onramp');
-        await acceptDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        if (order.relayerSecret === 'treasury') {
+          await performRelayedAction('accept', order.txHash!);
+        } else {
+          const { acceptDeliverableWithKeypair } = await import('@/lib/onramp');
+          await acceptDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        }
       } else {
         await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address));
       }
@@ -396,8 +416,12 @@ export const ActiveProjectsView: React.FC = () => {
     if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
     try {
       if (order.relayerSecret) {
-        const { denyDeliverableWithKeypair } = await import('@/lib/onramp');
-        await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        if (order.relayerSecret === 'treasury') {
+          await performRelayedAction('deny', order.txHash!);
+        } else {
+          const { denyDeliverableWithKeypair } = await import('@/lib/onramp');
+          await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        }
       } else {
         await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address));
       }
@@ -452,9 +476,14 @@ export const ActiveProjectsView: React.FC = () => {
       const totalXlmRequired = (BigInt(1000) * BigInt(stroopsPerCent)).toString();
       
       if (order.relayerSecret) {
-        const { payForRevisionWithKeypair, denyDeliverableWithKeypair } = await import('@/lib/onramp');
-        await payForRevisionWithKeypair(order.txHash!, order.relayerSecret, totalXlmRequired);
-        await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        if (order.relayerSecret === 'treasury') {
+          await performRelayedAction('pay_revision', order.txHash!, { totalXlmRequired });
+          await performRelayedAction('deny', order.txHash!);
+        } else {
+          const { payForRevisionWithKeypair, denyDeliverableWithKeypair } = await import('@/lib/onramp');
+          await payForRevisionWithKeypair(order.txHash!, order.relayerSecret, totalXlmRequired);
+          await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        }
       } else {
         const contract = await import('@/lib/contract');
         await contract.payForRevision(order.txHash!, address, totalXlmRequired);
