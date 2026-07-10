@@ -46,9 +46,9 @@ export const SaaSXlmExplainer: React.FC<SaaSXlmExplainerProps> = ({ className = 
                   <Shield className="w-4 h-4 text-neongreen" />
                 </div>
                 <div>
-                  <h4 className="font-heading font-semibold text-sm text-white">Trustless Gas & Zero Extraction</h4>
+                  <h4 className="font-heading font-semibold text-sm text-white">Trustless Gas & Flat Platform Fees</h4>
                   <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                    Because Stellar charges only a fraction of a stroop (less than $0.0001 USD equivalent) per transaction, neither freelancers nor clients have to pay heavy platform extraction fees.
+                    Stellar network transaction fees are virtually zero (less than $0.0001). We charge 0% for your first 20 projects, followed by a market-low flat rate of just 1%.
                   </p>
                 </div>
               </div>

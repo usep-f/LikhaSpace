@@ -39,9 +39,9 @@ export const SaaSPlatformMetrics: React.FC<SaaSPlatformMetricsProps> = () => {
       <AnimatedSection stagger className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
         <AnimatedItem>
           <MetricCard
-            title="Extraction Fee"
-            value="0%"
-            description="Upwork and Fiverr take 10-20% of your payout. LikhaSpace takes nothing, allowing you to keep 100% of your earnings."
+            title="Platform Fee"
+            value="0%*"
+            description="Get 0% fees on your first 20 completed transactions, followed by a flat rate of just 1% thereafter."
             icon={<Percent className="w-5 h-5 text-neoncyan" />}
             borderClass="hover:border-neoncyan/40 hover:shadow-[0_0_20px_rgba(0,243,255,0.15)]"
           />

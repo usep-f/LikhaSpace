@@ -2,7 +2,7 @@
 LikhaSpace
 
 ## One-Line Description
-A Web3 Fiverr-style marketplace for Pinoy creatives featuring zero platform fees, flexible milestone escrows, and on-chain reviews to stop freelancers from getting scammed.
+A Web3 Fiverr-style marketplace for Pinoy creatives featuring low flat platform fees (0% introductory), flexible milestone escrows, and on-chain reviews to stop freelancers from getting scammed.
 
 ## Track
 Track 2 Financial Inclusion & Everyday Payments
@@ -15,7 +15,7 @@ Here in the Philippines, many college students and young creatives do freelance 
 - **On-chain Reputation Registry (`likha-reputation`):** Instead of just saving reviews in a normal database, we built a Soroban contract that stores the freelancer's rating, testimonial text, completed project count, and total earnings on-chain. This makes their portfolio and reputation immutable and impossible to fake.
 - **Blend Testnet Mock Oracle:** Since freelancer prices are set in USD (like $50) but paid in XLM, our escrow contract queries the Blend Mock Oracle (which uses Reflector's interface) during funding to get the real-time XLM/USD exchange rate so the client deposits the exact right amount of XLM.
 - **Stellar Wallets Kit:** We integrated this so users can easily sign transactions using Freighter Wallet or other wallets.
-- **XLM Payments & Gas:** XLM is used to fund the escrows and pay for the gas fees when interacting with the smart contracts. Since the platform fee is 0%, the only cost is the tiny Stellar network gas fee.
+- **XLM Payments & Gas:** XLM is used to fund the escrows and pay for the gas fees when interacting with the smart contracts. Freelancers pay 0% fees on their first 20 completed transactions, followed by a flat platform fee of just 1% (much lower than legacy platforms). The only other cost is the tiny Stellar network gas fee.
 
 ## GitHub Repository
 https://github.com/usep-f/LikhaSpace

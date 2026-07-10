@@ -42,7 +42,7 @@ export const SaaSUseCases: React.FC<SaaSUseCasesProps> = ({ className = '' }) =>
               <ul className="space-y-3 pt-2">
                 <li className="flex items-start space-x-3 text-xs text-gray-300 text-left">
                   <Coins className="w-4 h-4 text-hotpink shrink-0 mt-0.5" />
-                  <span><strong className="font-semibold text-white">0% Platform Extraction Fees</strong>: Take home 100% of your payout minus fraction-of-a-cent network gas.</span>
+                  <span><strong className="font-semibold text-white">0% Fees for 20 Transactions</strong>: Pay 0% on your first 20 completed projects, followed by a flat 1% rate.</span>
                 </li>
                 <li className="flex items-start space-x-3 text-xs text-gray-300 text-left">
                   <ShieldCheck className="w-4 h-4 text-hotpink shrink-0 mt-0.5" />

@@ -192,19 +192,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 charSpeed={50}
                 onComplete={handleLine1Done}
               />
-              {phase >= 1 && (
-                <>
-                  <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-hotpink to-neoncyan text-glow-pink text-shimmer-gradient">
-                    <TypewriterText
-                      text="Zero Extraction Fees."
-                      startDelay={200}
-                      charSpeed={40}
-                      onComplete={handleLine2Done}
-                    />
-                  </span>
-                </>
-              )}
+              <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-hotpink to-neoncyan text-glow-pink text-shimmer-gradient">
+                {phase >= 1 ? (
+                  <TypewriterText
+                    text="0% Fees to Start."
+                    startDelay={200}
+                    charSpeed={40}
+                    onComplete={handleLine2Done}
+                  />
+                ) : (
+                  <span className="invisible">0% Fees to Start.</span>
+                )}
+              </span>
             </h1>
 
             {/* Subtitle */}

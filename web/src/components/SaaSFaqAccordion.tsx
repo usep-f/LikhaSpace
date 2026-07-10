@@ -31,6 +31,10 @@ const FAQS: FaqItem[] = [
     question: 'How are disputes resolved?',
     answer: 'If there is a dispute regarding a deliverable, either party can trigger mediation. First, the client and freelancer can propose a split ratio of the locked funds. If they cannot agree, the dispute is escalated to an independent platform mediator who reviews the work history and resolves the dispute via the contract.',
   },
+  {
+    question: "How do LikhaSpace's platform fees work?",
+    answer: "Freelancers pay 0% fees on their first 20 completed transactions. After that, we apply a flat platform fee of just 1% to fund platform operations—substantially lower than the 10-20% fee charged by traditional freelancing platforms like Upwork and Fiverr.",
+  },
 ];
 
 export const SaaSFaqAccordion: React.FC<SaaSFaqAccordionProps> = () => {

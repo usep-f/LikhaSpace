@@ -33,15 +33,7 @@ const StepCard: React.FC<StepCardProps> = ({ step, title, description, icon, bor
   </div>
 );
 
-/* Animated connector dot+line between step cards (desktop only) */
-const StepConnector: React.FC = () => (
-  <div className="hidden lg:flex items-center justify-center" aria-hidden="true">
-    <div className="relative w-full flex items-center">
-      <div className="h-[2px] w-full bg-gradient-to-r from-white/10 via-hotpink/40 to-neoncyan/40 animate-draw-line" />
-      <div className="absolute right-0 w-2 h-2 rounded-full bg-neoncyan shadow-[0_0_8px_rgba(0,243,255,0.6)]" />
-    </div>
-  </div>
-);
+
 
 export const SaaSHowItWorks: React.FC<SaaSHowItWorksProps> = () => {
   const steps = [
@@ -86,14 +78,19 @@ export const SaaSHowItWorks: React.FC<SaaSHowItWorksProps> = () => {
         </p>
       </AnimatedSection>
 
-      <AnimatedSection stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 items-stretch">
+      <AnimatedSection stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
         {steps.map((s, idx) => (
-          <React.Fragment key={s.step}>
-            <AnimatedItem className="lg:col-span-1 sm:col-span-1">
-              <StepCard {...s} />
-            </AnimatedItem>
-            {idx < steps.length - 1 && <StepConnector />}
-          </React.Fragment>
+          <AnimatedItem key={s.step} className="relative col-span-1">
+            <StepCard {...s} />
+            {idx < steps.length - 1 && (
+              <div className="hidden lg:flex absolute top-1/2 -right-8 w-8 -translate-y-1/2 items-center justify-center z-20 pointer-events-none" aria-hidden="true">
+                <div className="relative w-full flex items-center">
+                  <div className="h-[2px] w-full bg-gradient-to-r from-white/10 via-hotpink/40 to-neoncyan/40 animate-draw-line" />
+                  <div className="absolute right-0 w-2 h-2 rounded-full bg-neoncyan shadow-[0_0_8px_rgba(0,243,255,0.6)]" />
+                </div>
+              </div>
+            )}
+          </AnimatedItem>
         ))}
       </AnimatedSection>
     </section>
