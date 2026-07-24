@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { useNotification } from '@/context/NotificationContext';
-import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, ShieldAlert } from 'lucide-react';
+import { MessageSquare, ExternalLink, ShieldCheck, Activity, X, ShieldAlert, Wallet, QrCode } from 'lucide-react';
 import { Order, Gig, FreelancerProfile } from '@/lib/types';
 import { ChatModal } from '@/components/ChatModal';
 import { DeliverablesModal } from '@/components/DeliverablesModal';
@@ -11,6 +11,8 @@ import { StatusModal } from '@/components/StatusModal';
 import { CancelModal } from '@/components/CancelModal';
 import { DisputeModal } from '@/components/DisputeModal';
 import { ReviewModal } from '@/components/ReviewModal';
+import { QRPhPaymentModal } from '@/components/QRPhPaymentModal';
+import { TokenSelectionModal } from '@/components/TokenSelectionModal';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { Pagination } from '@/components/Pagination';
@@ -52,14 +54,17 @@ function getMilestonesConfig(order: Order) {
   }];
 }
 
-async function checkEscrowBalance(address: string, priceUSD: number): Promise<boolean> {
+async function checkEscrowBalance(address: string, priceUSD: number, currency: 'XLM' | 'USDC' = 'XLM'): Promise<boolean> {
+  if (currency === 'USDC') {
+    return true; // Assume enough USDC for testnet
+  }
   const balanceXlm = await getXlmBalance(address);
   const requiredXlm = await getRequiredXlmForGig(priceUSD);
   return balanceXlm >= requiredXlm + 5;
 }
 
 export const ActiveProjectsView: React.FC = () => {
-  const { address, userProfile } = useWallet();
+  const { uid, address, userProfile } = useWallet();
   const [clientOrders, setClientOrders] = useState<(Order & { gigInfo?: Gig })[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -73,8 +78,23 @@ export const ActiveProjectsView: React.FC = () => {
   const [activeDisputeOrder, setActiveDisputeOrder] = useState<Order | null>(null);
   const [activeReviewOrder, setActiveReviewOrder] = useState<Order | null>(null);
   const [activeFreelancerProfile, setActiveFreelancerProfile] = useState<FreelancerProfile | null>(null);
+  const [activeQRPhOrder, setActiveQRPhOrder] = useState<Order | null>(null);
+  const [activeTokenSelectionOrder, setActiveTokenSelectionOrder] = useState<Order | null>(null);
+  const [tokenSelectionType, setTokenSelectionType] = useState<'wallet' | 'qrph' | null>(null);
 
   const { showToast, showLoading, hideLoading } = useNotification();
+
+  const performRelayedAction = async (action: string, contractId: string, extraArgs: Record<string, unknown> = {}) => {
+    const res = await fetch('/api/onramp/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, contractId, ...extraArgs })
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to execute relayed action');
+    }
+  };
 
   const handleViewFreelancerProfile = async (freelancerAddress: string) => {
     showLoading('Loading freelancer profile...');
@@ -108,8 +128,8 @@ export const ActiveProjectsView: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (!address) return;
-    const unsubscribe = subscribeToClientOrders(address, async (orders) => {
+    if (!uid) return;
+    const unsubscribe = subscribeToClientOrders(uid, async (orders) => {
       const enriched = await Promise.all(
         orders.map(async (o) => {
           const gigInfo = await getGig(o.gigId);
@@ -119,14 +139,14 @@ export const ActiveProjectsView: React.FC = () => {
       setClientOrders(enriched);
     });
     return () => unsubscribe();
-  }, [address]);
+  }, [uid]);
 
-  const handleFundEscrow = async (order: Order) => {
+  const handleFundEscrow = async (order: Order, currency: 'XLM' | 'USDC' = 'XLM') => {
     if (!address) return showToast('Wallet not connected', 'error');
     showToast('Checking wallet balance...', 'info');
     try {
       showLoading('Funding Escrow via Freighter...');
-      const hasBalance = await checkEscrowBalance(address, order.priceUSD);
+      const hasBalance = await checkEscrowBalance(address, order.priceUSD, currency);
       if (!hasBalance) {
         const requiredXlm = await getRequiredXlmForGig(order.priceUSD);
         const actualBal = await getXlmBalance(address);
@@ -138,11 +158,19 @@ export const ActiveProjectsView: React.FC = () => {
         address,
         order.freelancerAddress,
         1000,
-        getMilestonesConfig(order)
+        getMilestonesConfig(order),
+        currency
       );
-      const stroopsPerCent = await getOraclePrice();
-      const totalXlmRequired = (BigInt(order.priceUSD * 100) * BigInt(stroopsPerCent)).toString();
-      await fundEscrow(contractId, address, totalXlmRequired);
+      
+      let totalTokenRequired = '';
+      if (currency === 'USDC') {
+        totalTokenRequired = (BigInt(Math.round(order.priceUSD * 100)) * BigInt(100000)).toString();
+      } else {
+        const stroopsPerCent = await getOraclePrice();
+        totalTokenRequired = (BigInt(Math.round(order.priceUSD * 100)) * BigInt(stroopsPerCent)).toString();
+      }
+      
+      await fundEscrow(contractId, address, totalTokenRequired);
       
       const defaultMilestones = order.milestones?.length ? order.milestones.map((m, idx) => ({
         ...m,
@@ -172,7 +200,7 @@ export const ActiveProjectsView: React.FC = () => {
       });
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Escrow Funded',
         message: `Escrow has been funded. You can now start working on the project!`,
@@ -209,7 +237,7 @@ export const ActiveProjectsView: React.FC = () => {
 
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Booking Cancelled',
         message: `The booking was cancelled by the client before funding.`,
@@ -227,10 +255,21 @@ export const ActiveProjectsView: React.FC = () => {
   };
 
   const handleCancelFunded = async (order: Order) => {
-    if (!address || !order.txHash) return showToast('Missing contract or wallet data', 'error');
+    if (!order.txHash) return showToast('Missing contract data', 'error');
+    const isRelayed = order.relayerSecret === 'treasury';
+    if (!isRelayed && !address) return showToast('Wallet connection required for this action', 'error');
     try {
       showLoading('Canceling project with kill fee on-chain...');
-      await clientCancelWithKillFee(order.txHash, address);
+      if (order.relayerSecret) {
+        if (order.relayerSecret === 'treasury') {
+          await performRelayedAction('cancel', order.txHash);
+        } else {
+          const { clientCancelWithKillFeeWithKeypair } = await import('@/lib/onramp');
+          await clientCancelWithKillFeeWithKeypair(order.txHash, order.relayerSecret);
+        }
+      } else {
+        await clientCancelWithKillFee(order.txHash, address!);
+      }
 
       const newChangelog = {
         id: crypto.randomUUID(),
@@ -246,7 +285,7 @@ export const ActiveProjectsView: React.FC = () => {
 
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Project Cancelled',
         message: `The project was cancelled by the client. Current milestone payout paid as kill fee, future milestones refunded.`,
@@ -283,7 +322,7 @@ export const ActiveProjectsView: React.FC = () => {
 
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Dispute Initiated',
         message: `A dispute has been initiated for this project.`,
@@ -303,10 +342,20 @@ export const ActiveProjectsView: React.FC = () => {
 
   const handleApproveDeliverables = async (orderId: string) => {
     const order = clientOrders.find(o => o.id === orderId);
-    if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
+    if (!order || !order.txHash) return showToast('Error: Missing contract data', 'error');
+    const isRelayed = order.relayerSecret === 'treasury';
+    if (!isRelayed && !address) return showToast('Wallet connection required for this action', 'error');
     try {
-      showLoading(`Approving deliverables for order on-chain...`);
-      await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address));
+      if (order.relayerSecret) {
+        if (order.relayerSecret === 'treasury') {
+          await performRelayedAction('accept', order.txHash!);
+        } else {
+          const { acceptDeliverableWithKeypair } = await import('@/lib/onramp');
+          await acceptDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        }
+      } else {
+        await import('@/lib/contract').then(m => m.acceptDeliverable(order.txHash!, address!));
+      }
       
       const milestones = order.milestones ? [...order.milestones] : [];
       const currentIdx = order.currentMilestoneIdx || 0;
@@ -343,7 +392,7 @@ export const ActiveProjectsView: React.FC = () => {
       
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: hasNext ? 'Milestone Approved' : 'Project Completed',
         message: hasNext 
@@ -368,10 +417,20 @@ export const ActiveProjectsView: React.FC = () => {
 
   const handleDenyDeliverables = async (orderId: string, reason: string) => {
     const order = clientOrders.find(o => o.id === orderId);
-    if (!order || !order.txHash || !address) return showToast('Error: Missing contract data', 'error');
+    if (!order || !order.txHash) return showToast('Error: Missing contract data', 'error');
+    const isRelayed = order.relayerSecret === 'treasury';
+    if (!isRelayed && !address) return showToast('Wallet connection required for this action', 'error');
     try {
-      showLoading(`Denying deliverables on-chain...`);
-      await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address));
+      if (order.relayerSecret) {
+        if (order.relayerSecret === 'treasury') {
+          await performRelayedAction('deny', order.txHash!);
+        } else {
+          const { denyDeliverableWithKeypair } = await import('@/lib/onramp');
+          await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        }
+      } else {
+        await import('@/lib/contract').then(m => m.denyDeliverable(order.txHash!, address!));
+      }
       
       const milestones = order.milestones ? [...order.milestones] : [];
       const currentIdx = order.currentMilestoneIdx || 0;
@@ -395,7 +454,7 @@ export const ActiveProjectsView: React.FC = () => {
       });
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: uid!,
         senderName: userProfile?.name || 'Client',
         title: 'Revision Requested',
         message: `Client requested a revision: "${reason}"`,
@@ -414,18 +473,29 @@ export const ActiveProjectsView: React.FC = () => {
 
   const handlePayForRevision = async (orderId: string, reason: string) => {
     const order = clientOrders.find(o => o.id === orderId);
-    if (!order || !order.txHash || !address) return showToast('Error: Missing data', 'error');
+    if (!order || !order.txHash) return showToast('Error: Missing data', 'error');
+    const isRelayed = order.relayerSecret === 'treasury';
+    if (!isRelayed && !address) return showToast('Wallet connection required for this action', 'error');
     
     try {
       showLoading(`Paying for additional revision on-chain...`);
       const stroopsPerCent = await getOraclePrice();
-      // Assume paid revision price is 1000 ($10) as in deployment
       const totalXlmRequired = (BigInt(1000) * BigInt(stroopsPerCent)).toString();
       
-      const contract = await import('@/lib/contract');
-      await contract.payForRevision(order.txHash!, address, totalXlmRequired);
-      
-      await contract.denyDeliverable(order.txHash!, address);
+      if (order.relayerSecret) {
+        if (order.relayerSecret === 'treasury') {
+          await performRelayedAction('pay_revision', order.txHash!, { totalXlmRequired });
+          await performRelayedAction('deny', order.txHash!);
+        } else {
+          const { payForRevisionWithKeypair, denyDeliverableWithKeypair } = await import('@/lib/onramp');
+          await payForRevisionWithKeypair(order.txHash!, order.relayerSecret, totalXlmRequired);
+          await denyDeliverableWithKeypair(order.txHash!, order.relayerSecret);
+        }
+      } else {
+        const contract = await import('@/lib/contract');
+        await contract.payForRevision(order.txHash!, address!, totalXlmRequired);
+        await contract.denyDeliverable(order.txHash!, address!);
+      }
       
       const milestones = order.milestones ? [...order.milestones] : [];
       const currentIdx = order.currentMilestoneIdx || 0;
@@ -450,7 +520,7 @@ export const ActiveProjectsView: React.FC = () => {
       });
       await createNotification({
         recipientId: order.freelancerAddress,
-        senderId: address!,
+        senderId: address || uid || '',
         senderName: userProfile?.name || 'Client',
         title: 'Revision Requested',
         message: `Client requested a revision: "${reason}"`,
@@ -571,13 +641,22 @@ export const ActiveProjectsView: React.FC = () => {
                 {order.status !== 'pending_acceptance' && (
                   <>
                     {order.status === 'awaiting_funding' && (
-                      <button
-                        title="Fund Escrow"
-                        onClick={() => handleFundEscrow(order)}
-                        className="p-2.5 rounded border bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)] transition-colors"
-                      >
-                        <Activity className="w-5 h-5" />
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          title="Fund via Wallet"
+                          onClick={() => { setActiveTokenSelectionOrder(order); setTokenSelectionType('wallet'); }}
+                          className="p-2.5 rounded border border-white/10 text-white hover:bg-white/5 cursor-pointer transition-colors"
+                        >
+                          <Wallet className="w-5 h-5" />
+                        </button>
+                        <button
+                          title="Fund via GCash (QR Ph)"
+                          onClick={() => { setActiveTokenSelectionOrder(order); setTokenSelectionType('qrph'); }}
+                          className="p-2.5 rounded border bg-[#ff00ff]/20 border-[#ff00ff] text-[#ff00ff] hover:bg-[#ff00ff]/40 cursor-pointer shadow-[0_0_10px_rgba(255,0,255,0.3)] transition-colors"
+                        >
+                          <QrCode className="w-5 h-5" />
+                        </button>
+                      </div>
                     )}
                     {(order.status === 'escrow_funded' || order.status === 'delivered') && (
                       <button
@@ -710,6 +789,27 @@ export const ActiveProjectsView: React.FC = () => {
         <ProfileModal
           profile={activeFreelancerProfile}
           onClose={() => setActiveFreelancerProfile(null)}
+        />
+      )}
+      {activeTokenSelectionOrder && tokenSelectionType && (
+        <TokenSelectionModal
+          onClose={() => { setActiveTokenSelectionOrder(null); setTokenSelectionType(null); }}
+          onSelect={(currency) => {
+            if (tokenSelectionType === 'wallet') {
+              handleFundEscrow(activeTokenSelectionOrder, currency);
+            } else if (tokenSelectionType === 'qrph') {
+              setActiveQRPhOrder({ ...activeTokenSelectionOrder, currency });
+            }
+            setActiveTokenSelectionOrder(null);
+            setTokenSelectionType(null);
+          }}
+        />
+      )}
+      {activeQRPhOrder && (
+        <QRPhPaymentModal
+          order={activeQRPhOrder}
+          onClose={() => setActiveQRPhOrder(null)}
+          onSuccess={() => {setActiveQRPhOrder(null)}}
         />
       )}
     </div>

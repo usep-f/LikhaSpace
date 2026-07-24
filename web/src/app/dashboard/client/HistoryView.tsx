@@ -10,7 +10,7 @@ import { UserWalletInfo } from '@/components/ui/UserWalletInfo';
 import { ProfileModal } from '@/components/ProfileModal';
 
 export const HistoryView: React.FC = () => {
-  const { address } = useWallet();
+  const { uid, address } = useWallet();
   const { showToast, showLoading, hideLoading } = useNotification();
   const [completedOrders, setCompletedOrders] = useState<(Order & { gigInfo?: Gig })[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -48,8 +48,13 @@ export const HistoryView: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (!address) return;
-    getClientOrders(address)
+    const fetchId = address || uid;
+    if (!fetchId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
+    getClientOrders(fetchId)
       .then(async (orders) => {
         const completed = orders.filter(o => o.status === 'completed' || o.status === 'denied' || o.status === 'settled_dispute');
         const enriched = await Promise.all(
@@ -65,7 +70,7 @@ export const HistoryView: React.FC = () => {
         console.error('Failed to load client history:', err);
         setLoading(false);
       });
-  }, [address]);
+  }, [address, uid]);
 
   if (loading) {
     return (

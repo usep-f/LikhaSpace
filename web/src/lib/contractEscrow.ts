@@ -20,11 +20,12 @@ import {
   ORACLE_ID,
   REPUTATION_CONTRACT_ID,
   TESTNET_XLM,
+  TESTNET_USDC_CONTRACT_ID,
   DEFAULT_MEDIATOR,
   PLATFORM_TREASURY,
 } from './contractConstants';
 
-function buildMilestonesScVal(
+export function buildMilestonesScVal(
   milestones: { payout_amount_usd: number; max_revisions: number }[]
 ): xdr.ScVal {
   const scvMilestones = milestones.map(m => {
@@ -69,7 +70,8 @@ async function initializeEscrowContract(
   clientAddress: string,
   freelancerAddress: string,
   paidRevisionPriceUsd: number,
-  milestones: { payout_amount_usd: number; max_revisions: number }[]
+  milestones: { payout_amount_usd: number; max_revisions: number }[],
+  tokenContractId: string
 ): Promise<void> {
   const initAccount = await server.getAccount(clientAddress);
   const initTxBuilder = new TransactionBuilder(initAccount, { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE })
@@ -77,7 +79,7 @@ async function initializeEscrowContract(
       'initialize',
       new Address(freelancerAddress).toScVal(),
       new Address(clientAddress).toScVal(),
-      new Address(TESTNET_XLM).toScVal(),
+      new Address(tokenContractId).toScVal(),
       new Address(ORACLE_ID).toScVal(),
       new Address(DEFAULT_MEDIATOR).toScVal(),
       new Address(PLATFORM_TREASURY).toScVal(),
@@ -93,7 +95,8 @@ export async function deployAndInitializeEscrow(
   clientAddress: string,
   freelancerAddress: string,
   paidRevisionPriceUsd: number, 
-  milestones: { payout_amount_usd: number; max_revisions: number }[]
+  milestones: { payout_amount_usd: number; max_revisions: number }[],
+  currency: 'XLM' | 'USDC' = 'XLM'
 ): Promise<string> {
   const salt = new Uint8Array(32);
   if (typeof window !== 'undefined' && window.crypto) {
@@ -103,7 +106,9 @@ export async function deployAndInitializeEscrow(
   if (!contractId) {
     throw new Error('Failed to parse contract ID from deployment metadata.');
   }
-  await initializeEscrowContract(contractId, clientAddress, freelancerAddress, paidRevisionPriceUsd, milestones);
+  
+  const tokenContractId = currency === 'USDC' ? TESTNET_USDC_CONTRACT_ID : TESTNET_XLM;
+  await initializeEscrowContract(contractId, clientAddress, freelancerAddress, paidRevisionPriceUsd, milestones, tokenContractId);
   return contractId;
 }
 

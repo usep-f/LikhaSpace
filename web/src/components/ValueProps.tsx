@@ -34,8 +34,8 @@ export const ValueProps: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <PropCard
-          title="Zero Platform Fees"
-          description="Traditional platforms extract 10% to 20% of your earnings. LikhaSpace takes 0%, with Stellar transactions costing less than $0.0001."
+          title="Low Platform Fees"
+          description="Traditional platforms extract 10% to 20% of your earnings. LikhaSpace charges 0% on your first 20 projects, followed by a flat 1% rate."
           icon={<DollarSign className="w-6 h-6 text-neongreen" />}
           borderColorClass="hover:border-neongreen/40 hover:shadow-[0_0_12px_rgba(57,255,20,0.15)]"
         />

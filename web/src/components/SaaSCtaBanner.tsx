@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowRight, Rocket } from 'lucide-react';
+import { LoginModal } from '@/components/LoginModal';
 import { useWallet } from '@/context/WalletContext';
 import { useRouter } from 'next/navigation';
 import { AnimatedSection } from '@/components/ui/AnimatedSection';
@@ -12,12 +13,13 @@ export interface SaaSCtaBannerProps {
 }
 
 export const SaaSCtaBanner: React.FC<SaaSCtaBannerProps> = () => {
-  const { isConnected, role, connectWallet } = useWallet();
+  const { isConnected, role } = useWallet();
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const router = useRouter();
 
   const handleCtaClick = () => {
     if (!isConnected) {
-      void connectWallet();
+      setShowLoginModal(true);
     } else if (role === 'artist') {
       router.push('/dashboard/artist');
     } else if (role === 'client') {
@@ -57,7 +59,7 @@ export const SaaSCtaBanner: React.FC<SaaSCtaBannerProps> = () => {
             >
               <span>
                 {!isConnected
-                  ? 'Connect Wallet & Onboard'
+                  ? 'Login & Onboard'
                   : role
                   ? 'Launch Dashboard'
                   : 'Browse Active Gigs'}
@@ -67,6 +69,9 @@ export const SaaSCtaBanner: React.FC<SaaSCtaBannerProps> = () => {
           </div>
         </div>
       </AnimatedSection>
+      {showLoginModal && (
+        <LoginModal onClose={() => setShowLoginModal(false)} />
+      )}
     </section>
   );
 };

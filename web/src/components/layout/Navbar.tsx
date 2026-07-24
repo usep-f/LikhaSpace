@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
-import { Wallet, LogOut, LayoutDashboard, Globe } from 'lucide-react';
+import { LogOut, LayoutDashboard, Globe, LogIn, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { NotificationBell } from './NotificationBell';
+import { LoginModal } from '@/components/LoginModal';
 
 // Sub-component: Brand Logo
 const BrandLogo: React.FC = () => (
@@ -41,23 +42,23 @@ const ConnectButtons: React.FC<WalletButtonProps> = ({ onConnect, isLoading }) =
       disabled={isLoading}
       className="btn-primary flex items-center space-x-2 bg-hotpink text-white hover:bg-hotpink/85 border border-hotpink/50 hover:shadow-[0_0_12px_rgba(255,0,127,0.4)] px-3 py-1.5 rounded-lg font-heading text-xs font-semibold cursor-pointer transition-all duration-200"
     >
-      <Wallet className="w-3.5 h-3.5" />
-      <span>{isLoading ? 'Connecting...' : 'Freighter'}</span>
+      <LogIn className="w-3.5 h-3.5" />
+      <span>{isLoading ? 'Logging in...' : 'Login'}</span>
     </button>
   </div>
 );
 
 // Sub-component: Connected User Profile Box
 interface ProfileBoxProps {
-  address: string;
+  address: string | null;
   name?: string;
   role: string | null;
   onDisconnect: () => void;
 }
 
 const ProfileBox: React.FC<ProfileBoxProps> = ({ address, name, role, onDisconnect }) => {
-  const shortAddress = `${address.slice(0, 4)}...${address.slice(-4)}`;
-  const displayName = name || shortAddress;
+  const shortAddress = address ? `${address.slice(0, 4)}...${address.slice(-4)}` : '';
+  const displayName = name || shortAddress || 'User';
   return (
     <div className="flex items-center space-x-3 bg-violet-dark/50 border border-white/10 px-2.5 py-1 rounded-lg">
       <div className="text-right">
@@ -68,7 +69,7 @@ const ProfileBox: React.FC<ProfileBoxProps> = ({ address, name, role, onDisconne
       </div>
       <button
         onClick={onDisconnect}
-        title="Disconnect Wallet"
+        title="Log Out"
         className="text-gray-400 hover:text-hotpink hover:text-glow-pink cursor-pointer transition-all duration-200 p-1 hover:bg-white/5 rounded"
       >
         <LogOut className="w-3.5 h-3.5" />
@@ -78,7 +79,9 @@ const ProfileBox: React.FC<ProfileBoxProps> = ({ address, name, role, onDisconne
 };
 
 export const Navbar: React.FC = () => {
-  const { address, role, isConnected, isLoading, connectWallet, disconnectWallet, userProfile } = useWallet();
+  const { uid, address, role, isConnected, isLoading, disconnectWallet, userProfile } = useWallet();
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const dashboardUrl = role === 'artist' 
     ? '/dashboard/artist' 
@@ -89,25 +92,24 @@ export const Navbar: React.FC = () => {
         : '#';
 
   return (
-    <nav className="sticky top-0 z-50 glass-card border-b border-white/5 w-full">
+    <nav className="sticky top-0 z-50 glass-card border-b border-white/5 w-full bg-[#0B0813]/85 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-6">
             <BrandLogo />
             <TestnetBadge />
-            
-
           </div>
           
-          <div className="flex items-center space-x-4">
+          {/* Desktop Navigation Group (Visible on screens >= 1000px) */}
+          <div className="hidden min-[1000px]:flex items-center space-x-4">
             {/* Navigation Links */}
-            <div className="flex items-center space-x-3 sm:space-x-4 border-r border-white/15 pr-4 mr-1">
+            <div className="flex items-center space-x-4 border-r border-white/15 pr-4 mr-1">
               <Link
                 href="/gigs"
                 className="flex items-center space-x-1 text-xs font-semibold text-gray-400 hover:text-white hover:text-glow-cyan transition-all duration-200 cursor-pointer"
               >
                 <Globe className="w-3.5 h-3.5 text-neoncyan" />
-                <span className="hidden sm:inline">Marketplace</span>
+                <span>Marketplace</span>
               </Link>
               {isConnected && role && (
                 <Link
@@ -115,22 +117,83 @@ export const Navbar: React.FC = () => {
                   className="flex items-center space-x-1 text-xs font-semibold text-gray-400 hover:text-white hover:text-glow-pink transition-all duration-200 cursor-pointer"
                 >
                   <LayoutDashboard className="w-3.5 h-3.5 text-hotpink" />
-                  <span className="hidden sm:inline">Dashboard</span>
+                  <span>Dashboard</span>
                 </Link>
               )}
             </div>
 
-            {isConnected && address ? (
+            {isConnected && uid ? (
               <>
                 <NotificationBell />
                 <ProfileBox address={address} name={userProfile?.name} role={role} onDisconnect={disconnectWallet} />
               </>
             ) : (
-              <ConnectButtons onConnect={connectWallet} isLoading={isLoading} />
+              <ConnectButtons onConnect={() => setShowLoginModal(true)} isLoading={isLoading} />
             )}
+          </div>
+
+          {/* Mobile Navigation Controls (Visible on screens < 1000px) */}
+          <div className="flex min-[1000px]:hidden items-center space-x-3">
+            {isConnected && uid && (
+              <NotificationBell />
+            )}
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-hotpink/50"
+              aria-label="Toggle menu"
+            >
+              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Dropdown Panel (Visible on screens < 1000px) */}
+      {isOpen && (
+        <div className="min-[1000px]:hidden border-t border-white/5 bg-[#0B0813]/95 backdrop-blur-xl px-4 py-4 space-y-4 shadow-2xl">
+          <div className="flex flex-col space-y-2">
+            <Link
+              href="/gigs"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center space-x-2 text-sm font-semibold text-gray-400 hover:text-white hover:text-glow-cyan transition-all duration-200 py-2 px-3 rounded-lg hover:bg-white/5 cursor-pointer"
+            >
+              <Globe className="w-4 h-4 text-neoncyan" />
+              <span>Marketplace</span>
+            </Link>
+            {isConnected && role && (
+              <Link
+                href={dashboardUrl}
+                onClick={() => setIsOpen(false)}
+                className="flex items-center space-x-2 text-sm font-semibold text-gray-400 hover:text-white hover:text-glow-pink transition-all duration-200 py-2 px-3 rounded-lg hover:bg-white/5 cursor-pointer"
+              >
+                <LayoutDashboard className="w-4 h-4 text-hotpink" />
+                <span>Dashboard</span>
+              </Link>
+            )}
+          </div>
+          
+          <div className="border-t border-white/5 pt-4">
+            {isConnected && uid ? (
+              <div className="flex items-center justify-between w-full">
+                <ProfileBox address={address} name={userProfile?.name} role={role} onDisconnect={() => {
+                  disconnectWallet();
+                  setIsOpen(false);
+                }} />
+              </div>
+            ) : (
+              <div className="w-full" onClick={() => {
+                setShowLoginModal(true);
+                setIsOpen(false);
+              }}>
+                <ConnectButtons onConnect={() => setShowLoginModal(true)} isLoading={isLoading} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {showLoginModal && (
+        <LoginModal onClose={() => setShowLoginModal(false)} />
+      )}
     </nav>
   );
 };

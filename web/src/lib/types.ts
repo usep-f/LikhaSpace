@@ -79,6 +79,8 @@ export interface Order {
 
   // On-Chain Verification
   txHash?: string;
+  relayerSecret?: string;
+  currency?: 'XLM' | 'USDC';
 
   // Rating/Review for completed orders
   review?: {
